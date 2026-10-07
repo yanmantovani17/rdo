@@ -1,0 +1,21 @@
+RDO GOLGI RODOANEL - APP PARA CELULAR
+=====================================
+
+PUBLICAR NO GITHUB PAGES (grátis)
+1. Crie uma conta em github.com.
+2. Crie um repositório PÚBLICO chamado "rdo" (botão "New").
+3. No repositório: "Add file" > "Upload files" e arraste TODOS os arquivos
+   desta pasta (sem a pasta em volta). Clique em "Commit changes".
+4. Settings > Pages > em "Branch" escolha "main" e "/ (root)" > Save.
+5. Depois de 1-2 minutos o app fica em: https://SEU-USUARIO.github.io/rdo/
+
+INSTALAR NO IPHONE
+1. Abra o endereço acima no Safari.
+2. Compartilhar (quadrado com seta) > "Adicionar à Tela de Início" > Adicionar.
+3. Abra sempre pelo ícone. Na primeira vez, vá na aba "Obra" e confira
+   empresas, equipamentos e responsáveis.
+
+IMPORTANTE
+- Os RDOs e as fotos ficam guardados no próprio celular. Use "Exportar backup"
+  na aba Obra de vez em quando.
+- Para atualizar o app: suba os arquivos novos e troque VERSAO no sw.js.

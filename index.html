@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="RDO">
+<meta name="theme-color" content="#26313b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>RDO Golgi Rodoanel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one-column field form, sticky header with the day, section cards, fixed action bar at the bottom. */
+:root{
+  --bg:#eef0ee; --surface:#ffffff; --surface-2:#f5f6f4; --ink:#1d2329; --muted:#5d6670; --line:#d5d9d6;
+  --asphalt:#26313b; --asphalt-ink:#f3f5f2; --signal:#e8a100; --signal-ink:#1d2329; --signal-soft:#fff3d1;
+  --ok:#2f7d4f; --ok-soft:#e1f1e7; --warn:#b4561b; --warn-soft:#fbe8dc; --focus:#1f6fb2;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14191e; --surface:#1d242b; --surface-2:#232b33; --ink:#e9ece9; --muted:#9aa4ad; --line:#323c46;
+  --asphalt:#0d1115; --asphalt-ink:#e9ece9; --signal:#f2b322; --signal-ink:#14191e; --signal-soft:#3a2f12;
+  --ok:#5cc187; --ok-soft:#173326; --warn:#f0925a; --warn-soft:#3b2318; --focus:#6cb3f0; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14191e; --surface:#1d242b; --surface-2:#232b33; --ink:#e9ece9; --muted:#9aa4ad; --line:#323c46;
+  --asphalt:#0d1115; --asphalt-ink:#e9ece9; --signal:#f2b322; --signal-ink:#14191e; --signal-soft:#3a2f12;
+  --ok:#5cc187; --ok-soft:#173326; --warn:#f0925a; --warn-soft:#3b2318; --focus:#6cb3f0; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.4}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.wrap{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:12px 120px;display:flex;flex-direction:column;gap:14px}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--asphalt);color:var(--asphalt-ink)}
+.top-in{max-width:720px;margin:0 auto;padding:10px 16px 0;display:flex;flex-direction:column;gap:8px}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:1.15rem;letter-spacing:.06em;text-transform:uppercase;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand small{display:block;font-family:var(--f-body);font-weight:500;font-size:.72rem;letter-spacing:.08em;opacity:.7}
+.sync{font-size:.75rem;opacity:.8;white-space:nowrap}
+.daybar{display:flex;align-items:center;gap:6px}
+.daybar button{background:transparent;border:1px solid rgba(255,255,255,.25);color:inherit;border-radius:8px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}
+.daybox{flex:1;min-width:0;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.08);border-radius:8px;padding:4px 10px;height:40px}
+.daybox input[type=date]{background:transparent;border:0;color:var(--asphalt-ink);font-family:var(--f-mono);font-weight:600;font-size:1rem;min-width:0;flex:1;color-scheme:dark;padding:0;min-height:0;width:auto}
+.rdonum{font-family:var(--f-mono);font-weight:600;background:var(--signal);color:var(--signal-ink);border-radius:6px;padding:2px 8px;font-size:.85rem;white-space:nowrap}
+.tabs{display:flex;gap:2px}
+.tabs button{flex:1;background:transparent;border:0;color:inherit;opacity:.65;padding:10px 4px 9px;font-family:var(--f-display);font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:.9rem;border-bottom:3px solid transparent;cursor:pointer}
+.tabs button[aria-selected="true"]{opacity:1;border-bottom-color:var(--signal)}
+.hazard{height:5px;background:repeating-linear-gradient(-45deg,var(--signal) 0 10px,var(--asphalt) 10px 20px)}
+
+/* cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.card>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px 14px}
+.card>summary::-webkit-details-marker{display:none}
+.card>summary h2{margin:0;font-family:var(--f-display);font-weight:700;font-size:1.15rem;letter-spacing:.05em;text-transform:uppercase}
+.card>summary .sum{margin-left:auto;font-size:.82rem;color:var(--muted);text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
+.card>summary .chev{transition:transform .15s;color:var(--muted)}
+.card[open]>summary .chev{transform:rotate(90deg)}
+.dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--line);flex:none}
+.dot.on{background:var(--ok);border-color:var(--ok)}
+.body{padding:0 14px 16px;display:flex;flex-direction:column;gap:14px}
+.lbl{font-size:.75rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:6px}
+input[type=text],input[type=number],input[type=date],select,textarea{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:44px}
+textarea{resize:vertical;min-height:88px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{min-width:0}
+.grow{flex:1}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:8px 13px;min-height:40px;cursor:pointer;font-weight:500;font-size:.92rem}
+.chip[aria-pressed="true"]{background:var(--asphalt);border-color:var(--asphalt);color:var(--asphalt-ink)}
+:root[data-theme="dark"] .chip[aria-pressed="true"]{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .chip[aria-pressed="true"]{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}}
+.period{border-top:1px dashed var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.period:first-child{border-top:0;padding-top:0}
+.period h3{margin:0;font-family:var(--f-display);font-weight:600;font-size:1.05rem;letter-spacing:.04em}
+
+/* hours */
+.hours{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+.hours button{min-height:42px;border-radius:7px;border:1px solid var(--line);background:var(--surface-2);font-family:var(--f-mono);font-size:.85rem;cursor:pointer}
+.hours button[aria-pressed="true"]{background:var(--warn);border-color:var(--warn);color:#fff}
+
+/* people */
+.emp{border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+.emp-h{display:flex;align-items:center;gap:8px;padding:10px 12px}
+.emp-h strong{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tot{margin-left:auto;font-family:var(--f-mono);font-weight:600;min-width:2.2em;text-align:center;border-radius:6px;padding:2px 6px;background:var(--surface);border:1px solid var(--line)}
+.tot.has{background:var(--signal-soft);border-color:var(--signal)}
+.emp-b{padding:0 12px 12px;display:flex;flex-direction:column;gap:6px}
+.fn{display:flex;align-items:center;gap:8px}
+.fn span{flex:1;min-width:0;font-size:.95rem}
+.step{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface);flex:none}
+.step button{width:40px;height:40px;border:0;background:transparent;font-size:1.25rem;cursor:pointer}
+.step input{width:46px;border:0;text-align:center;font-family:var(--f-mono);font-weight:600;background:transparent;min-height:40px;padding:0;-moz-appearance:textfield}
+.step input::-webkit-inner-spin-button{-webkit-appearance:none}
+.big-total{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--f-display);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.big-total b{font-family:var(--f-mono);font-size:1.4rem}
+
+/* list rows */
+.item{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--surface-2)}
+.item-h{display:flex;gap:8px;align-items:center}
+.n{font-family:var(--f-mono);font-size:.8rem;color:var(--muted);width:1.8em;flex:none}
+.x{border:0;background:transparent;color:var(--muted);width:40px;height:40px;font-size:1.3rem;cursor:pointer;flex:none;border-radius:8px}
+.x:hover{color:var(--warn)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-weight:600;cursor:pointer}
+.btn.pri{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
+.btn.dark{background:var(--asphalt);border-color:var(--asphalt);color:var(--asphalt-ink)}
+.btn.ghost{background:transparent;border-style:dashed}
+.btn[disabled]{opacity:.55;cursor:default}
+.btn.full{width:100%}
+
+/* assistant */
+.assist{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--signal);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
+.assist h2{margin:0;font-family:var(--f-display);font-weight:700;font-size:1.15rem;letter-spacing:.05em;text-transform:uppercase}
+.assist p{margin:0;color:var(--muted);font-size:.92rem}
+.note{font-size:.88rem;color:var(--muted)}
+.msg{font-size:.9rem;border-radius:8px;padding:10px 12px;background:var(--ok-soft);color:var(--ink)}
+.msg.err{background:var(--warn-soft)}
+
+/* photos */
+.photos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ph{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ph .img{aspect-ratio:1.43;max-width:100%;border-radius:8px;background:var(--surface-2) center/cover no-repeat;border:1px solid var(--line);position:relative}
+.ph .img .x{position:absolute;top:4px;right:4px;background:var(--surface);opacity:.9;width:34px;height:34px}
+.ph .tag{position:absolute;left:6px;bottom:6px;font-family:var(--f-mono);font-size:.72rem;background:var(--asphalt);color:var(--asphalt-ink);padding:1px 6px;border-radius:4px}
+.ph textarea{min-height:64px;font-size:.9rem}
+.addph{aspect-ratio:1.43;border:2px dashed var(--line);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted);cursor:pointer;font-weight:600;text-align:center;padding:8px}
+.addph input{display:none}
+
+/* bottom bar */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+.bar-in{max-width:720px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.bar .prog{font-size:.8rem;color:var(--muted);line-height:1.2;flex:none;max-width:38%}
+.bar .prog b{display:block;font-family:var(--f-mono);color:var(--ink);font-size:1rem}
+.bar .btn{flex:1}
+
+/* history & config */
+.wrap>#sections{display:flex;flex-direction:column;gap:12px}
+.hist{display:flex;flex-direction:column;gap:8px}
+.hrow{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.hrow .d{font-family:var(--f-mono);font-weight:600}
+.hrow .s{font-size:.82rem;color:var(--muted)}
+.hrow .grow{min-width:0}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.grid2>*,.resp>*{min-width:0}
+.resp{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:6px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--asphalt);color:var(--asphalt-ink);padding:10px 16px;border-radius:8px;z-index:30;max-width:calc(100% - 32px);font-size:.92rem;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.sheet-h{font-family:var(--f-display);font-weight:700;font-size:1.3rem;letter-spacing:.05em;text-transform:uppercase;margin:4px 0 0}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+html,body{margin:0}
+body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+.top{top:0;padding-top:env(safe-area-inset-top,0px)}
+.backup{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <h1 id="obraName">RDO<small>Relatório Diário de Obra</small></h1>
+      <span class="sync" id="sync">carregando…</span>
+    </div>
+    <div class="daybar" id="daybar">
+      <button type="button" id="prevDay" aria-label="Dia anterior">‹</button>
+      <div class="daybox"><input type="date" id="dayInput" aria-label="Data do RDO"><span class="rdonum" id="rdoNum">Nº —</span></div>
+      <button type="button" id="nextDay" aria-label="Próximo dia">›</button>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" id="tab-dia" aria-selected="true" data-view="dia">Dia</button>
+      <button role="tab" id="tab-hist" aria-selected="false" data-view="hist">Histórico</button>
+      <button role="tab" id="tab-obra" aria-selected="false" data-view="obra">Obra</button>
+    </nav>
+  </div>
+  <div class="hazard"></div>
+</header>
+
+<main class="wrap" id="view-dia">
+  <section class="assist" id="assist">
+    <h2>Preencher rápido</h2>
+    <p>Conte como foi o dia (digitando ou pelo microfone do teclado). O Claude distribui nos campos do RDO e você só confere.</p>
+    <textarea id="aiText" placeholder="Ex.: Manhã com sol, à tarde choveu forte e paramos das 14h às 16h, uns 18 mm no pluviômetro. LHM com 1 encarregado e 8 serventes no reaterro das sapatas do eixo 3. Perfurac cravando estacas com o bate-estaca. 2 escavadeiras e 3 caminhões."></textarea>
+    <div class="row">
+      <button type="button" class="btn pri grow" id="aiBtn">Preencher com IA</button>
+      <button type="button" class="btn" id="copyPrev">Copiar do dia anterior</button>
+    </div>
+    <div id="aiMsg" hidden></div>
+    <div id="aiPaste" class="field" hidden>
+      <span class="lbl">Resposta do Claude</span>
+      <textarea id="aiAnswer" rows="4" placeholder="Cole aqui a resposta que o Claude devolveu"></textarea>
+      <div class="row"><button type="button" class="btn dark grow" id="aiApply">Aplicar no RDO</button><button type="button" class="btn" id="aiReopen">Abrir o Claude</button></div>
+    </div>
+  </section>
+  <div id="sections"></div>
+</main>
+
+<main class="wrap" id="view-hist" hidden>
+  <h2 class="sheet-h">RDOs salvos</h2>
+  <div class="hist" id="histList"></div>
+</main>
+
+<main class="wrap" id="view-obra" hidden>
+  <h2 class="sheet-h">Dados da obra</h2>
+  <p class="note">Essas informações se repetem em todo RDO. Ajuste uma vez e o app usa todos os dias.</p>
+  <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:12px">
+    <label class="field"><span class="lbl">Nome da obra</span><input type="text" id="c-obra"></label>
+    <div class="grid2">
+      <label class="field"><span class="lbl">Início do contrato</span><input type="date" id="c-inicio"></label>
+      <label class="field"><span class="lbl">Término</span><input type="date" id="c-termino"></label>
+    </div>
+    <label class="field"><span class="lbl">Empresas (uma por linha, até 30)</span><textarea id="c-empresas" rows="8"></textarea></label>
+    <label class="field"><span class="lbl">Equipamentos (um por linha, até 20)</span><textarea id="c-equip" rows="8"></textarea></label>
+    <label class="field"><span class="lbl">Funções extras do efetivo (até 4, uma por linha)</span><textarea id="c-fextra" rows="3" placeholder="Funções que não existem na planilha padrão"></textarea></label>
+    <div class="field"><span class="lbl">Elaboração (nome · função)</span><div class="resp" id="c-elab"></div></div>
+    <div class="field"><span class="lbl">Recebimento (nome · função)</span><div class="resp" id="c-receb"></div></div>
+    <button type="button" class="btn dark full" id="saveCfg">Salvar dados da obra</button>
+  </div>
+  <h2 class="sheet-h">Backup</h2>
+  <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
+  <div class="backup"><button type="button" class="btn" id="expBk">Exportar backup</button><label class="btn">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
+</main>
+
+<div class="bar" id="bar">
+  <div class="bar-in">
+    <div class="prog" id="prog"><b>0/7</b>seções</div>
+    <button type="button" class="btn pri" id="genBtn">Gerar RDO em Excel</button>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="jszip.min.js"></script>
+<script src="template.js"></script>
+<script src="rdo-gen.js"></script>
+<script>
+(function(){
+'use strict';
+var G = window.RDOGen;
+var $ = function(s, r){ return (r||document).querySelector(s); };
+var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
+function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function todayISO(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function addDays(iso,n){ var p=iso.split('-'); var d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]+n)); return d.toISOString().slice(0,10); }
+function br(iso){ if(!iso) return ''; var p=iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+
+// Template-derived defaults (the structure of the uploaded RDO model), used until the obra is configured
+var DEFAULT_CFG = {
+  obra:'GOLGI RODOANEL NORTE', inicio:'2026-02-26', termino:'2026-12-17',
+  empresas:['Libercon Engenharia','Libercon Construções','LHM','Globall','Império Construções','Perfurac','Stack','Geositu','J2R','Alphageos','Roll-on','Geocoring','Premovale','TNG'],
+  equipamentos:['Gerador','Máquina de compactação dinâmica','Retroescavadeira','Escavadeira','Caminhão','Munck','Motoniveladora','Rolo compactador liso','Rolo compactador pé de carneiro','Guindaste','Plataforma elevatória articulada','Bate-estaca'],
+  funcoesExtras:[], funcoesVisExtras:[],
+  elaboracao:[], recebimento:[]
+};
+var PERIODS=[['manha','Manhã'],['tarde','Tarde'],['noite','Noite']];
+
+function blankRdo(date){
+  return {data:date, clima:{manha:{},tarde:{},noite:{}}, mm:'', paralisacao:new Array(24).fill(false),
+    efetivo:{}, visitantes:[], equip:{}, atividades:[], ocorrencias:'', comLibercon:'', comCliente:'', fotos:[], updatedAt:0};
+}
+function normRdo(r, date){
+  var b=blankRdo(date); r=r||{};
+  Object.keys(b).forEach(function(k){ if(r[k]!==undefined && r[k]!==null) b[k]=r[k]; });
+  PERIODS.forEach(function(p){ b.clima[p[0]]=b.clima[p[0]]||{}; });
+  if(!Array.isArray(b.paralisacao)||b.paralisacao.length!==24){ var a=new Array(24).fill(false); (b.paralisacao||[]).forEach(function(v,i){ if(i<24)a[i]=!!v; }); b.paralisacao=a; }
+  b.data=date; return b;
+}
+
+// ---------- storage: shared db when available, browser cache always ----------
+var db=null, downloads=null, sample=null, sampleImages=false;
+var LS={get:function(k){ try{ var v=localStorage.getItem('rdo:'+k); return v?JSON.parse(v):null; }catch(e){ return null; } },
+        set:function(k,v){ try{ localStorage.setItem('rdo:'+k, JSON.stringify(v)); }catch(e){} }};
+function unpack(d){ if(!d) return null; if(typeof d.json==='string'){ try{ return JSON.parse(d.json); }catch(e){ return null; } } return d; }
+var Store={
+  getConfig: async function(){
+    if(db){ try{ var s=await db.doc('obra/config').get(); if(s.exists){ var c=unpack(s.data()); if(c){ LS.set('config',c); return c; } } }catch(e){} }
+    return LS.get('config');
+  },
+  saveConfig: async function(c){ LS.set('config',c); if(db){ await db.doc('obra/config').set({json:JSON.stringify(c),updatedAt:Date.now()}); } },
+  getRdo: async function(date){
+    var local=LS.get('d:'+date);
+    if(db){ try{ var s=await db.doc('rdos/'+date).get(); if(s.exists){ var r=unpack(s.data()); if(r&&(!local||(r.updatedAt||0)>=(local.updatedAt||0))){ LS.set('d:'+date,r); return r; } } }catch(e){} }
+    return local;
+  },
+  saveRdo: async function(r){
+    LS.set('d:'+r.data, r);
+    var idx=LS.get('index')||{}; idx[r.data]=summaryOf(r); LS.set('index',idx);
+    if(db){ await db.doc('rdos/'+r.data).set({json:JSON.stringify(r),updatedAt:r.updatedAt||Date.now(),resumo:summaryOf(r)}); }
+  },
+  list: async function(){
+    var out={}; var idx=LS.get('index')||{}; Object.keys(idx).forEach(function(d){ out[d]=idx[d]; });
+    if(db){ try{ var q=await db.collection('rdos').get(); q.docs.forEach(function(s){ var d=s.data(); out[s.id]=d.resumo||summaryOf(unpack(d)); }); }catch(e){} }
+    return out;
+  }
+};
+// photos stay on this device (IndexedDB)
+var IDB={ _db:null,
+  open:function(){ var self=this; if(self._db) return Promise.resolve(self._db);
+    return new Promise(function(res,rej){ try{ var q=indexedDB.open('rdo-fotos',1); q.onupgradeneeded=function(){ q.result.createObjectStore('fotos'); };
+      q.onsuccess=function(){ self._db=q.result; res(self._db); }; q.onerror=function(){ rej(q.error); }; }catch(e){ rej(e); } }); },
+  put:function(id,blob){ return this.open().then(function(d){ return new Promise(function(res,rej){ var t=d.transaction('fotos','readwrite'); t.objectStore('fotos').put(blob,id); t.oncomplete=function(){res();}; t.onerror=function(){rej(t.error);}; }); }); },
+  get:function(id){ return this.open().then(function(d){ return new Promise(function(res){ var t=d.transaction('fotos'); var q=t.objectStore('fotos').get(id); q.onsuccess=function(){res(q.result||null);}; q.onerror=function(){res(null);}; }); }).catch(function(){ return null; }); },
+  del:function(id){ return this.open().then(function(d){ var t=d.transaction('fotos','readwrite'); t.objectStore('fotos').delete(id); }).catch(function(){}); }
+};
+
+// ---------- state ----------
+var cfg=clone(DEFAULT_CFG), rdo=blankRdo(todayISO()), openSections={clima:true};
+var photoURLs={};
+
+function totalEfetivo(r){ var t=0; Object.keys(r.efetivo||{}).forEach(function(e){ var q=r.efetivo[e]||{}; Object.keys(q).forEach(function(f){ t+=(+q[f]||0); }); }); return t; }
+function summaryOf(r){ if(!r) return {}; var ativ=(r.atividades||[]).filter(function(a){return a.desc;}).length;
+  return {efetivo:totalEfetivo(r), atividades:ativ, fotos:(r.fotos||[]).length, clima:[r.clima&&r.clima.manha&&r.clima.manha.cond, r.clima&&r.clima.tarde&&r.clima.tarde.cond].filter(Boolean).join('/'), updatedAt:r.updatedAt||0}; }
+function rdoNumber(date){ var a=G.serial(date), b=G.serial(cfg.inicio); return (a&&b)? a-b+1 : null; }
+
+var saveTimer=null;
+function touch(){ rdo.updatedAt=Date.now(); setSync('salvando…'); clearTimeout(saveTimer); saveTimer=setTimeout(doSave,700); updateProgress(); }
+async function doSave(){ try{ await Store.saveRdo(clone(rdo)); setSync(db?'salvo na nuvem':'salvo neste aparelho'); }catch(e){ setSync('salvo neste aparelho'); } }
+function setSync(t){ $('#sync').textContent=t; }
+var toastTimer; function toast(t){ var el=$('#toast'); el.textContent=t; el.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(function(){ el.hidden=true; },3200); }
+
+// ---------- sections ----------
+function done(key){
+  var r=rdo;
+  switch(key){
+    case 'clima': return PERIODS.every(function(p){ return r.clima[p[0]].cond && r.clima[p[0]].status; });
+    case 'efetivo': return totalEfetivo(r)>0;
+    case 'visit': return (r.visitantes||[]).some(function(v){ return v.empresa; });
+    case 'equip': return Object.keys(r.equip||{}).some(function(k){ return (+r.equip[k].qtd||0)>0; });
+    case 'ativ': return (r.atividades||[]).some(function(a){ return a.desc; });
+    case 'ocorr': return !!(r.ocorrencias||r.comLibercon);
+    case 'fotos': return (r.fotos||[]).length>0;
+  }
+}
+var SECTIONS=[
+  ['clima','Clima',function(){ return PERIODS.map(function(p){ return rdo.clima[p[0]].cond||'—'; }).join(' · ')+(rdo.mm!==''&&rdo.mm!=null?' · '+rdo.mm+' mm':''); }, renderClima],
+  ['efetivo','Mão de obra',function(){ return totalEfetivo(rdo)+' pessoas'; }, renderEfetivo],
+  ['visit','Visitantes',function(){ var n=0; rdo.visitantes.forEach(function(v){ Object.keys(v.q||{}).forEach(function(f){ n+=(+v.q[f]||0); }); }); return n? n+' visitante(s)':'nenhum'; }, renderVisit],
+  ['equip','Equipamentos',function(){ var n=0; Object.keys(rdo.equip).forEach(function(k){ n+=(+rdo.equip[k].qtd||0); }); return n+' em obra'; }, renderEquip],
+  ['ativ','Atividades',function(){ return rdo.atividades.filter(function(a){return a.desc;}).length+' registrada(s)'; }, renderAtiv],
+  ['ocorr','Ocorrências',function(){ return rdo.ocorrencias? 'preenchido':'vazio'; }, renderOcorr],
+  ['fotos','Fotos',function(){ return rdo.fotos.length+' de '+G.LIMITS.fotos; }, renderFotos]
+];
+function renderAll(){
+  var host=$('#sections'); host.innerHTML='';
+  SECTIONS.forEach(function(s){
+    var d=document.createElement('details'); d.className='card'; d.id='sec-'+s[0]; if(openSections[s[0]]) d.open=true;
+    d.innerHTML='<summary><span class="dot'+(done(s[0])?' on':'')+'"></span><h2>'+h(s[1])+'</h2><span class="sum"></span><span class="chev">›</span></summary><div class="body"></div>';
+    d.addEventListener('toggle',function(){ openSections[s[0]]=d.open; });
+    host.appendChild(d);
+    s[3]($('.body',d)); refreshSummary(s[0]);
+  });
+  updateHeader(); updateProgress();
+}
+function refreshSummary(key){ var s=SECTIONS.find(function(x){return x[0]===key;}); var d=$('#sec-'+key); if(!d) return; $('.sum',d).textContent=s[2](); $('.dot',d).className='dot'+(done(key)?' on':''); }
+function rerender(key){ var s=SECTIONS.find(function(x){return x[0]===key;}); var d=$('#sec-'+key); var old=$('.body',d); var b=document.createElement('div'); b.className='body'; old.replaceWith(b); s[3](b); refreshSummary(key); }
+function changed(key){ refreshSummary(key); touch(); }
+function updateProgress(){ var req=SECTIONS.filter(function(s){ return s[0]!=='visit'; }); var n=req.filter(function(s){ return done(s[0]); }).length; $('#prog').innerHTML='<b>'+n+'/'+req.length+'</b>seções ok'; }
+function updateHeader(){ $('#obraName').innerHTML=h(cfg.obra||'RDO')+'<small>Relatório Diário de Obra</small>'; var n=rdoNumber(rdo.data); $('#rdoNum').textContent='Nº '+(n||'—'); $('#dayInput').value=rdo.data; }
+
+function chipGroup(opts, val, attrs){ return '<div class="chips">'+opts.map(function(o){ return '<button type="button" class="chip" aria-pressed="'+(o===val)+'" '+attrs+' data-v="'+h(o)+'">'+h(o)+'</button>'; }).join('')+'</div>'; }
+
+function renderClima(b){
+  var html=PERIODS.map(function(p){ var c=rdo.clima[p[0]];
+    return '<div class="period"><h3>'+p[1]+'</h3><span class="lbl">Condição</span>'+chipGroup(G.CONDICOES,c.cond,'data-clima="'+p[0]+'" data-k="cond"')+
+      '<span class="lbl">Status das atividades</span>'+chipGroup(G.STATUS,c.status,'data-clima="'+p[0]+'" data-k="status"')+
+      '<input type="text" id="obs-'+p[0]+'" data-obs="'+p[0]+'" placeholder="Observação (ex.: chuva forte às 14h)" value="'+h(c.obs||'')+'"></div>';
+  }).join('');
+  html+='<div class="row"><button type="button" class="btn ghost" id="climaAll">Repetir a manhã na tarde e na noite</button></div>';
+  html+='<label class="field"><span class="lbl">Índice pluviométrico (mm)</span><input type="number" inputmode="decimal" id="mm" value="'+h(rdo.mm)+'" placeholder="0"></label>';
+  html+='<div class="field"><span class="lbl">Paralisações / interrupções — toque nas horas paradas</span><div class="hours">'+
+    rdo.paralisacao.map(function(v,i){ return '<button type="button" data-hour="'+i+'" aria-pressed="'+!!v+'">'+i+'h</button>'; }).join('')+'</div></div>';
+  b.innerHTML=html;
+  b.addEventListener('click',function(e){
+    var c=e.target.closest('[data-clima]'); if(c){ var per=c.dataset.clima,k=c.dataset.k; rdo.clima[per][k]= rdo.clima[per][k]===c.dataset.v? '' : c.dataset.v;
+      $$('[data-clima="'+per+'"][data-k="'+k+'"]',b).forEach(function(x){ x.setAttribute('aria-pressed', String(x.dataset.v===rdo.clima[per][k])); }); changed('clima'); return; }
+    var hr=e.target.closest('[data-hour]'); if(hr){ var i=+hr.dataset.hour; rdo.paralisacao[i]=!rdo.paralisacao[i]; hr.setAttribute('aria-pressed',String(rdo.paralisacao[i])); changed('clima'); return; }
+    if(e.target.id==='climaAll'){ var m=rdo.clima.manha; rdo.clima.tarde={cond:m.cond,status:m.status,obs:rdo.clima.tarde.obs||''}; rdo.clima.noite={cond:m.cond,status:m.status==='Sem impactos'?'Sem Atividades':m.status,obs:rdo.clima.noite.obs||''}; rerender('clima'); touch(); }
+  });
+  b.addEventListener('input',function(e){ if(e.target.dataset.obs){ rdo.clima[e.target.dataset.obs].obs=e.target.value; touch(); } if(e.target.id==='mm'){ rdo.mm=e.target.value; changed('clima'); } });
+}
+
+function stepper(val, attrs){ return '<div class="step"><button type="button" data-step="-1" '+attrs+' aria-label="Menos">−</button><input type="number" inputmode="numeric" min="0" value="'+(val||0)+'" '+attrs+' aria-label="Quantidade"><button type="button" data-step="1" '+attrs+' aria-label="Mais">+</button></div>'; }
+function funcOptions(list, used){ return '<option value="">+ adicionar função…</option>'+list.filter(function(f){ return !used[f]; }).map(function(f){ return '<option>'+h(f.replace(/\s+/g,' '))+'</option>'; }).join(''); }
+function recFuncs(){ return G.FUNC_REC.concat(cfg.funcoesExtras||[]); }
+function canonFunc(list, name){ var n=String(name||'').replace(/\s+/g,' ').trim().toLowerCase(); return list.find(function(f){ return f.replace(/\s+/g,' ').trim().toLowerCase()===n; }); }
+
+function empresasOrdem(){ var list=(cfg.empresas||[]).slice(); Object.keys(rdo.efetivo).forEach(function(e){ if(list.indexOf(e)<0) list.push(e); }); return list; }
+function renderEfetivo(b){
+  var list=empresasOrdem();
+  var html='<div class="big-total"><span>Efetivo total</span><b id="efTot">'+totalEfetivo(rdo)+'</b></div>';
+  html+=list.map(function(emp,ei){ var q=rdo.efetivo[emp]||{}; var t=0; Object.keys(q).forEach(function(f){ t+=(+q[f]||0); });
+    var rows=Object.keys(q).map(function(f){ return '<div class="fn"><span>'+h(f.replace(/\s+/g,' '))+'</span>'+stepper(q[f],'data-emp="'+ei+'" data-fn="'+h(f)+'"')+'</div>'; }).join('');
+    return '<div class="emp" data-empbox="'+ei+'"><div class="emp-h"><strong>'+h(emp)+'</strong><span class="tot'+(t?' has':'')+'" data-tot="'+ei+'">'+t+'</span></div><div class="emp-b">'+rows+
+      '<select data-addfn="'+ei+'" aria-label="Adicionar função em '+h(emp)+'">'+funcOptions(recFuncs(),q)+'</select></div></div>';
+  }).join('');
+  html+='<div class="row"><input type="text" id="newEmp" class="grow" placeholder="Nova empresa"><button type="button" class="btn" id="addEmp">Adicionar</button></div>';
+  b.innerHTML=html;
+  function empName(i){ return list[+i]; }
+  function setQ(ei,fn,v){ var e=empName(ei); rdo.efetivo[e]=rdo.efetivo[e]||{}; v=Math.max(0,Math.round(+v||0)); rdo.efetivo[e][fn]=v;
+    var t=0; Object.keys(rdo.efetivo[e]).forEach(function(f){ t+=(+rdo.efetivo[e][f]||0); }); var tt=$('[data-tot="'+ei+'"]',b); tt.textContent=t; tt.className='tot'+(t?' has':''); $('#efTot',b).textContent=totalEfetivo(rdo); changed('efetivo'); return v; }
+  b.addEventListener('click',function(e){ var s=e.target.closest('[data-step]'); if(s&&s.dataset.emp!==undefined){ var inp=s.parentNode.querySelector('input'); inp.value=setQ(s.dataset.emp,s.dataset.fn,(+inp.value||0)+(+s.dataset.step)); }
+    if(e.target.id==='addEmp'){ var n=$('#newEmp',b).value.trim(); if(!n) return; if((cfg.empresas||[]).indexOf(n)<0){ if(cfg.empresas.length>=G.LIMITS.empresas){ toast('A planilha aceita até 30 empresas.'); return; } cfg.empresas.push(n); Store.saveConfig(cfg); } rdo.efetivo[n]=rdo.efetivo[n]||{}; rerender('efetivo'); touch(); } });
+  b.addEventListener('input',function(e){ if(e.target.matches('input[data-fn]')){ setQ(e.target.dataset.emp,e.target.dataset.fn,e.target.value); } });
+  b.addEventListener('change',function(e){ var a=e.target.closest('[data-addfn]'); if(a&&a.value){ var emp=empName(a.dataset.addfn); var fn=canonFunc(recFuncs(),a.value)||a.value; rdo.efetivo[emp]=rdo.efetivo[emp]||{}; rdo.efetivo[emp][fn]=rdo.efetivo[emp][fn]||1; rerender('efetivo'); touch(); } });
+}
+
+function renderVisit(b){
+  var html=rdo.visitantes.map(function(v,vi){ var q=v.q||{};
+    var rows=Object.keys(q).map(function(f){ return '<div class="fn"><span>'+h(f)+'</span>'+stepper(q[f],'data-vi="'+vi+'" data-fn="'+h(f)+'"')+'</div>'; }).join('');
+    return '<div class="item"><div class="item-h"><input type="text" data-vemp="'+vi+'" class="grow" placeholder="Empresa" value="'+h(v.empresa)+'" list="empList"><button type="button" class="x" data-vdel="'+vi+'" aria-label="Remover">×</button></div>'+rows+
+      '<select data-vadd="'+vi+'">'+funcOptions(G.FUNC_VIS.concat(cfg.funcoesVisExtras||[]),q)+'</select></div>';
+  }).join('');
+  html+='<button type="button" class="btn ghost" id="addVis">+ Visitante / efetivo eventual</button>';
+  b.innerHTML=html;
+  b.addEventListener('click',function(e){ var s=e.target.closest('[data-step]');
+    if(s&&s.dataset.vi!==undefined){ var inp=s.parentNode.querySelector('input'); var v=Math.max(0,(+inp.value||0)+(+s.dataset.step)); inp.value=v; rdo.visitantes[+s.dataset.vi].q[s.dataset.fn]=v; changed('visit'); }
+    if(e.target.dataset.vdel!==undefined){ rdo.visitantes.splice(+e.target.dataset.vdel,1); rerender('visit'); touch(); }
+    if(e.target.id==='addVis'){ if(rdo.visitantes.length>=G.LIMITS.visitantes){ toast('A planilha aceita até 8 linhas de visitantes.'); return; } rdo.visitantes.push({empresa:'Libercon Engenharia',q:{}}); rerender('visit'); touch(); } });
+  b.addEventListener('input',function(e){ if(e.target.dataset.vemp!==undefined){ rdo.visitantes[+e.target.dataset.vemp].empresa=e.target.value; changed('visit'); }
+    if(e.target.matches('input[data-vi]')){ rdo.visitantes[+e.target.dataset.vi].q[e.target.dataset.fn]=Math.max(0,+e.target.value||0); changed('visit'); } });
+  b.addEventListener('change',function(e){ if(e.target.dataset.vadd!==undefined&&e.target.value){ rdo.visitantes[+e.target.dataset.vadd].q[e.target.value]=1; rerender('visit'); touch(); } });
+}
+
+function equipOrdem(){ var list=(cfg.equipamentos||[]).slice(); Object.keys(rdo.equip).forEach(function(e){ if(list.indexOf(e)<0) list.push(e); }); return list; }
+function renderEquip(b){
+  var list=equipOrdem();
+  var html=list.map(function(eq,i){ var it=rdo.equip[eq]||{};
+    return '<div class="item"><div class="item-h"><strong class="grow">'+h(eq)+'</strong>'+stepper(it.qtd,'data-eq="'+i+'"')+'</div><input type="text" data-eqobs="'+i+'" placeholder="Frente de trabalho / observação" value="'+h(it.obs||'')+'"></div>';
+  }).join('');
+  html+='<div class="row"><input type="text" id="newEq" class="grow" placeholder="Novo equipamento"><button type="button" class="btn" id="addEq">Adicionar</button></div>';
+  b.innerHTML=html;
+  function set(i,patch){ var n=list[+i]; rdo.equip[n]=Object.assign({qtd:0,obs:''},rdo.equip[n],patch); changed('equip'); }
+  b.addEventListener('click',function(e){ var s=e.target.closest('[data-step]'); if(s&&s.dataset.eq!==undefined){ var inp=s.parentNode.querySelector('input'); var v=Math.max(0,(+inp.value||0)+(+s.dataset.step)); inp.value=v; set(s.dataset.eq,{qtd:v}); }
+    if(e.target.id==='addEq'){ var n=$('#newEq',b).value.trim(); if(!n) return; if(cfg.equipamentos.indexOf(n)<0){ if(cfg.equipamentos.length>=G.LIMITS.equipamentos){ toast('A planilha aceita até 20 equipamentos.'); return; } cfg.equipamentos.push(n); Store.saveConfig(cfg); } rdo.equip[n]=rdo.equip[n]||{qtd:1,obs:''}; rerender('equip'); touch(); } });
+  b.addEventListener('input',function(e){ if(e.target.matches('input[data-eq]')) set(e.target.dataset.eq,{qtd:Math.max(0,+e.target.value||0)}); if(e.target.dataset.eqobs!==undefined) set(e.target.dataset.eqobs,{obs:e.target.value}); });
+}
+
+function renderAtiv(b){
+  var opts='<option value=""></option>'+empresasOrdem().map(function(e){ return '<option>'+h(e)+'</option>'; }).join('');
+  var html=rdo.atividades.map(function(a,i){
+    return '<div class="item"><div class="item-h"><span class="n">'+(i+1)+'</span><select data-aemp="'+i+'" class="grow" aria-label="Empresa">'+opts.replace('<option>'+h(a.empresa)+'</option>','<option selected>'+h(a.empresa)+'</option>')+'</select><button type="button" class="x" data-adel="'+i+'" aria-label="Remover">×</button></div>'+
+      '<textarea data-adesc="'+i+'" rows="2" placeholder="Descrição da atividade">'+h(a.desc)+'</textarea></div>';
+  }).join('');
+  html+='<button type="button" class="btn ghost" id="addAt">+ Atividade</button>';
+  b.innerHTML=html;
+  b.addEventListener('click',function(e){ if(e.target.dataset.adel!==undefined){ rdo.atividades.splice(+e.target.dataset.adel,1); rerender('ativ'); touch(); }
+    if(e.target.id==='addAt'){ if(rdo.atividades.length>=G.LIMITS.atividades){ toast('A planilha aceita até 40 atividades.'); return; } rdo.atividades.push({empresa:'',desc:''}); rerender('ativ'); var t=$$('[data-adesc]',b).pop(); if(t) t.focus(); touch(); } });
+  b.addEventListener('input',function(e){ if(e.target.dataset.adesc!==undefined){ rdo.atividades[+e.target.dataset.adesc].desc=e.target.value; changed('ativ'); } });
+  b.addEventListener('change',function(e){ if(e.target.dataset.aemp!==undefined){ rdo.atividades[+e.target.dataset.aemp].empresa=e.target.value; changed('ativ'); } });
+}
+
+function renderOcorr(b){
+  b.innerHTML='<label class="field"><span class="lbl">Ocorrências</span><textarea id="t-ocorr" rows="4" placeholder="Fatos relevantes: acidentes, fiscalizações, falta de material, interferências…">'+h(rdo.ocorrencias)+'</textarea></label>'+
+    '<label class="field"><span class="lbl">Comentários Libercon</span><textarea id="t-lib" rows="3">'+h(rdo.comLibercon)+'</textarea></label>'+
+    '<label class="field"><span class="lbl">Comentários do cliente</span><textarea id="t-cli" rows="3" placeholder="Normalmente preenchido pelo cliente">'+h(rdo.comCliente)+'</textarea></label>';
+  b.addEventListener('input',function(e){ var m={'t-ocorr':'ocorrencias','t-lib':'comLibercon','t-cli':'comCliente'}[e.target.id]; if(m){ rdo[m]=e.target.value; changed('ocorr'); } });
+}
+
+function renderFotos(b){
+  var html='<p class="note">Use fotos na horizontal. Elas ficam guardadas neste aparelho e são encaixadas nos quadros da página 4 (e dos anexos, a partir da 7ª).</p><div class="photos">';
+  html+=rdo.fotos.map(function(f,i){
+    return '<div class="ph"><div class="img" data-phimg="'+f.id+'"><span class="tag">'+(i+1)+'</span><button type="button" class="x" data-phdel="'+i+'" aria-label="Remover foto">×</button></div>'+
+      '<textarea data-phcap="'+i+'" placeholder="Legenda">'+h(f.legenda)+'</textarea>'+(sample&&sampleImages?'<button type="button" class="btn ghost" data-phai="'+i+'">Sugerir legenda</button>':'')+'</div>';
+  }).join('');
+  if(rdo.fotos.length<G.LIMITS.fotos) html+='<label class="addph"><input type="file" accept="image/*" multiple id="phInput"><span style="font-size:1.6rem">＋</span>Adicionar fotos</label>';
+  html+='</div>';
+  b.innerHTML=html;
+  rdo.fotos.forEach(function(f){ showThumb(f.id, $('[data-phimg="'+f.id+'"]',b)); });
+  b.addEventListener('change',function(e){ if(e.target.id==='phInput') addPhotos(e.target.files); });
+  b.addEventListener('input',function(e){ if(e.target.dataset.phcap!==undefined){ rdo.fotos[+e.target.dataset.phcap].legenda=e.target.value; touch(); } });
+  b.addEventListener('click',function(e){ var d=e.target.closest('[data-phdel]'); if(d){ e.preventDefault(); var f=rdo.fotos.splice(+d.dataset.phdel,1)[0]; IDB.del(f.id); rerender('fotos'); touch(); }
+    var a=e.target.closest('[data-phai]'); if(a) captionAI(+a.dataset.phai, a); });
+}
+async function showThumb(id, el){ if(!el) return; var url=photoURLs[id]; if(!url){ var bl=await IDB.get(id); if(!bl){ el.style.backgroundImage='none'; el.insertAdjacentHTML('beforeend','<span class="note" style="position:absolute;inset:auto 8px 30px 8px">Foto salva em outro aparelho</span>'); return; } url=photoURLs[id]=URL.createObjectURL(bl); } el.style.backgroundImage='url("'+url+'")'; }
+function loadImg(blob){ return new Promise(function(res,rej){ var u=URL.createObjectURL(blob); var im=new Image(); im.onload=function(){ res(im); }; im.onerror=rej; im.src=u; }); }
+function canvasBlob(c,q){ return new Promise(function(res){ c.toBlob(res,'image/jpeg',q||0.85); }); }
+async function shrink(file){ var im=await loadImg(file); var max=1800, s=Math.min(1, max/Math.max(im.naturalWidth,im.naturalHeight)); var c=document.createElement('canvas'); c.width=Math.round(im.naturalWidth*s); c.height=Math.round(im.naturalHeight*s); c.getContext('2d').drawImage(im,0,0,c.width,c.height); return canvasBlob(c,0.85); }
+async function addPhotos(files){
+  var arr=Array.prototype.slice.call(files||[]); var room=G.LIMITS.fotos-rdo.fotos.length; if(arr.length>room){ toast('Só cabem mais '+room+' foto(s).'); arr=arr.slice(0,room); }
+  setSync('processando fotos…');
+  for(var i=0;i<arr.length;i++){ try{ var bl=await shrink(arr[i]); var id='f'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); await IDB.put(id,bl); rdo.fotos.push({id:id,legenda:''}); }catch(e){ toast('Não consegui abrir uma das imagens.'); } }
+  rerender('fotos'); touch();
+}
+async function cropForSlot(blob, idx){ var im=await loadImg(blob); var ar=G.frameAspect(idx); var w=im.naturalWidth, hh=im.naturalHeight, sw=w, sh=w/ar; if(sh>hh){ sh=hh; sw=hh*ar; }
+  var c=document.createElement('canvas'); c.width=1400; c.height=Math.round(1400/ar); c.getContext('2d').drawImage(im,(w-sw)/2,(hh-sh)/2,sw,sh,0,0,c.width,c.height);
+  var out=await canvasBlob(c,0.82); return new Uint8Array(await out.arrayBuffer()); }
+
+// ---------- AI ----------
+function aiMsg(t,err){ var m=$('#aiMsg'); m.hidden=!t; m.className='msg'+(err?' err':''); m.textContent=t||''; }
+var SAMPLE_ERR={not_granted:'Você não autorizou o uso da IA neste app.',rate_limited:'Muitas solicitações seguidas. Espere um minuto e tente de novo.',prompt_too_large:'Texto longo demais. Divida em partes.',refused:'A IA não conseguiu processar esse texto.',invalid_json:'A resposta veio incompleta. Tente de novo.'};
+async function fillAI(){
+  var txt=$('#aiText').value.trim(); if(!txt){ aiMsg('Escreva primeiro como foi o dia.',true); return; }
+  var btn=$('#aiBtn'); btn.disabled=true; btn.textContent='Lendo o relato…'; aiMsg('');
+  var prompt=['Você ajuda um engenheiro de obra a preencher o RDO (Relatório Diário de Obra) da obra '+cfg.obra+', dia '+br(rdo.data)+'.',
+    'Converta o RELATO abaixo em JSON. Inclua SOMENTE o que o relato informa; omita chaves sem informação.',
+    'Listas válidas (use o texto exato quando corresponder):',
+    'condicoes: '+JSON.stringify(G.CONDICOES),'status: '+JSON.stringify(G.STATUS),
+    'empresas: '+JSON.stringify(empresasOrdem()),'funcoes_efetivo: '+JSON.stringify(recFuncs().map(function(f){return f.replace(/\s+/g,' ');})),
+    'funcoes_visitantes: '+JSON.stringify(G.FUNC_VIS),'equipamentos: '+JSON.stringify(equipOrdem()),
+    'Formato:',
+    '{"clima":{"manha":{"cond":"","status":"","obs":""},"tarde":{...},"noite":{...}},"mm":0,"paralisacao_horas":[14,15],"efetivo":[{"empresa":"","funcao":"","qtd":0}],"visitantes":[{"empresa":"","funcao":"","qtd":0}],"equipamentos":[{"desc":"","qtd":0,"obs":""}],"atividades":[{"empresa":"","desc":""}],"ocorrencias":"","comLibercon":""}',
+    'Regras: status "Sem impactos" quando o clima não atrapalhou; "Paralisado" quando parou; "Parcialmente Impactado" quando atrapalhou parte. paralisacao_horas = horas cheias (0-23) em que o trabalho parou; "das 14h às 16h" = [14,15]. Se a empresa/função/equipamento não estiver na lista, use o nome como foi dito. Funções genéricas como "ajudante", "servente", "pedreiro" mapeiam para a função da lista. Atividades: frases técnicas curtas, uma por item, com a empresa responsável. Ocorrências: só fatos relevantes (chuva forte, acidente, fiscalização, falta de material). Escreva em português formal de relatório.',
+    'RELATO:', txt].join('\n');
+  if(!sample){ btn.disabled=false; btn.textContent='Preencher com IA'; aiViaClaude(prompt); return; }
+  try{
+    var r=await sample.json(prompt,{modelTier:'default'});
+    var log=applyAI(r||{});
+    aiMsg(log.length? 'Preenchido: '+log.join(', ')+'. Confira abaixo antes de gerar.' : 'Não encontrei informações para preencher no relato.', !log.length);
+    renderAll(); touch();
+  }catch(e){ aiMsg(SAMPLE_ERR[e&&e.code]||'Não foi possível usar a IA agora.',true); }
+  btn.disabled=false; btn.textContent='Preencher com IA';
+}
+function applyAI(r){
+  var log=[];
+  if(r.clima){ PERIODS.forEach(function(p){ var c=r.clima[p[0]]; if(!c) return; var d=rdo.clima[p[0]];
+    if(c.cond&&G.CONDICOES.indexOf(c.cond)>=0) d.cond=c.cond; if(c.status&&G.STATUS.indexOf(c.status)>=0) d.status=c.status; if(c.obs) d.obs=c.obs; }); log.push('clima'); }
+  if(r.mm!==undefined&&r.mm!==null&&r.mm!==''){ rdo.mm=String(r.mm); }
+  if(Array.isArray(r.paralisacao_horas)&&r.paralisacao_horas.length){ r.paralisacao_horas.forEach(function(x){ x=+x; if(x>=0&&x<24) rdo.paralisacao[x]=true; }); log.push('paralisações'); }
+  if(Array.isArray(r.efetivo)&&r.efetivo.length){ var n=0; r.efetivo.forEach(function(e){ if(!e.empresa||!e.funcao) return; var emp=empresasOrdem().find(function(x){ return x.toLowerCase().trim()===String(e.empresa).toLowerCase().trim(); })||e.empresa;
+      if(cfg.empresas.indexOf(emp)<0&&cfg.empresas.length<G.LIMITS.empresas){ cfg.empresas.push(emp); cfgDirty=true; }
+      var fn=canonFunc(recFuncs(),e.funcao); if(!fn){ if((cfg.funcoesExtras||[]).length<G.LIMITS.extrasRec){ cfg.funcoesExtras.push(e.funcao); fn=e.funcao; cfgDirty=true; } else fn=canonFunc(recFuncs(),'Ajudante'); }
+      rdo.efetivo[emp]=rdo.efetivo[emp]||{}; rdo.efetivo[emp][fn]=Math.max(0,Math.round(+e.qtd||0)); n++; }); if(n) log.push(n+' função(ões) no efetivo'); }
+  if(Array.isArray(r.visitantes)&&r.visitantes.length){ r.visitantes.forEach(function(v){ if(!v.empresa) return; var row=rdo.visitantes.find(function(x){ return x.empresa===v.empresa; }); if(!row){ if(rdo.visitantes.length>=G.LIMITS.visitantes) return; row={empresa:v.empresa,q:{}}; rdo.visitantes.push(row); } var fn=canonFunc(G.FUNC_VIS,v.funcao)||'Gerência'; row.q[fn]=Math.max(1,+v.qtd||1); }); log.push('visitantes'); }
+  if(Array.isArray(r.equipamentos)&&r.equipamentos.length){ r.equipamentos.forEach(function(q){ if(!q.desc) return; var name=equipOrdem().find(function(x){ return x.toLowerCase()===String(q.desc).toLowerCase(); })||q.desc;
+      if(cfg.equipamentos.indexOf(name)<0&&cfg.equipamentos.length<G.LIMITS.equipamentos){ cfg.equipamentos.push(name); cfgDirty=true; }
+      rdo.equip[name]=Object.assign({qtd:0,obs:''},rdo.equip[name],{qtd:Math.max(0,+q.qtd||0)}, q.obs?{obs:q.obs}:{}); }); log.push(r.equipamentos.length+' equipamento(s)'); }
+  if(Array.isArray(r.atividades)&&r.atividades.length){ rdo.atividades=rdo.atividades.filter(function(a){ return a.desc; }); var k=0; r.atividades.forEach(function(a){ if(!a.desc||rdo.atividades.length>=G.LIMITS.atividades) return; if(rdo.atividades.some(function(x){ return x.desc===a.desc; })) return;
+      var emp=empresasOrdem().find(function(x){ return x.toLowerCase().trim()===String(a.empresa||'').toLowerCase().trim(); })||a.empresa||''; rdo.atividades.push({empresa:emp,desc:a.desc}); k++; }); if(k) log.push(k+' atividade(s)'); }
+  if(r.ocorrencias){ rdo.ocorrencias= rdo.ocorrencias? rdo.ocorrencias+'\n'+r.ocorrencias : r.ocorrencias; log.push('ocorrências'); }
+  if(r.comLibercon){ rdo.comLibercon= rdo.comLibercon? rdo.comLibercon+'\n'+r.comLibercon : r.comLibercon; log.push('comentários'); }
+  if(cfgDirty){ cfgDirty=false; Store.saveConfig(cfg); }
+  return log;
+}
+var cfgDirty=false;
+var CLAUDE_URL='https://claude.ai/new';
+function openClaude(){ var a=document.createElement('a'); a.href=CLAUDE_URL; a.target='_blank'; a.rel='noopener'; document.body.appendChild(a); a.click(); a.remove(); }
+function aiViaClaude(prompt){
+  var full=prompt+'\n\nResponda SOMENTE com o JSON, sem nenhuma explicação.';
+  var go=function(ok){ $('#aiPaste').hidden=false; $('#aiAnswer').value='';
+    aiMsg(ok? '1) Copiei o pedido. 2) No Claude, cole e envie. 3) Copie a resposta e volte aqui. 4) Cole abaixo e toque em "Aplicar no RDO".' : 'Não consegui copiar sozinho. Toque no campo do relato, copie o texto e cole no Claude pedindo o JSON do RDO.', !ok);
+    openClaude(); };
+  try{ navigator.clipboard.writeText(full).then(function(){ go(true); }, function(){ go(false); }); }catch(e){ go(false); }
+}
+function applyPasted(){
+  var t=$('#aiAnswer').value; var a=t.indexOf('{'), b=t.lastIndexOf('}');
+  if(a<0||b<=a){ aiMsg('Não encontrei a resposta do Claude no texto colado. Copie a resposta inteira, incluindo as chaves { }.',true); return; }
+  var r; try{ r=JSON.parse(t.slice(a,b+1)); }catch(e){ aiMsg('A resposta colada está incompleta. Copie de novo a resposta inteira do Claude.',true); return; }
+  var log=applyAI(r||{}); renderAll(); touch(); $('#aiPaste').hidden=true; $('#aiText').value='';
+  aiMsg(log.length? 'Preenchido: '+log.join(', ')+'. Confira abaixo antes de gerar.' : 'A resposta não trouxe nada para preencher.', !log.length);
+}
+async function captionAI(i, btn){
+  var f=rdo.fotos[i]; var bl=await IDB.get(f.id); if(!bl){ toast('A foto não está neste aparelho.'); return; }
+  btn.disabled=true; btn.textContent='Analisando…';
+  try{ var r=await sample('Escreva uma legenda curta (máximo 15 palavras) para esta foto de um Relatório Diário de Obra de engenharia civil (obra '+cfg.obra+'). Use termos técnicos de obra em português, descreva o serviço ou a condição mostrada. Responda só com a legenda, sem aspas.',{images:[bl],modelTier:'quick'});
+    f.legenda=r.text.trim().replace(/^["“]|["”]$/g,''); rerender('fotos'); touch(); }
+  catch(e){ toast(SAMPLE_ERR[e&&e.code]||'Não foi possível sugerir agora.'); btn.disabled=false; btn.textContent='Sugerir legenda'; }
+}
+
+// ---------- copy from previous ----------
+async function copyPrev(){
+  var list=await Store.list(); var prev=Object.keys(list).filter(function(d){ return d<rdo.data; }).sort().pop();
+  if(!prev){ toast('Não há RDO anterior salvo.'); return; }
+  var p=normRdo(await Store.getRdo(prev),prev);
+  rdo.efetivo=clone(p.efetivo); rdo.equip=clone(p.equip); rdo.atividades=clone(p.atividades); rdo.visitantes=clone(p.visitantes||[]);
+  renderAll(); touch(); toast('Copiado de '+br(prev)+': efetivo, equipamentos e atividades. Ajuste o que mudou.');
+}
+
+// ---------- generate ----------
+function buildPayload(){
+  var efet=empresasOrdem().slice(0,G.LIMITS.empresas).map(function(e){ var q={}; var src=rdo.efetivo[e]||{}; Object.keys(src).forEach(function(f){ if(+src[f]) q[f]=+src[f]; }); return {empresa:e,q:q}; });
+  var eq=equipOrdem().slice(0,G.LIMITS.equipamentos).map(function(n){ var it=rdo.equip[n]||{}; return {desc:n,qtd:+it.qtd||0,obs:it.obs||''}; });
+  return { data:rdo.data, clima:rdo.clima, mm:rdo.mm, paralisacao:rdo.paralisacao, efetivo:efet, visitantes:rdo.visitantes.filter(function(v){return v.empresa;}),
+    equipamentos:eq, atividades:rdo.atividades.filter(function(a){ return a.desc||a.empresa; }), ocorrencias:rdo.ocorrencias, comLibercon:rdo.comLibercon, comCliente:rdo.comCliente, fotos:[] };
+}
+async function generate(target){
+  var r=target||rdo; var btn=$('#genBtn');
+  if(!window.JSZip){ toast('Sem conexão para carregar o gerador. Tente de novo com internet.'); return; }
+  btn.disabled=true; btn.textContent='Montando o RDO…';
+  try{
+    var keep=rdo; rdo=r; var payload=buildPayload(); rdo=keep;
+    for(var i=0;i<(r.fotos||[]).length;i++){ var f=r.fotos[i]; var bl=await IDB.get(f.id); payload.fotos.push({legenda:f.legenda||'', bytes: bl? await cropForSlot(bl,i) : null}); }
+    var out=await G.generate(window.JSZip, window.RDO_TEMPLATE_B64, cfg, payload, {type:'blob'});
+    var name=G.fileName(cfg,payload);
+    await deliverFile(name, out.data, out.numero);
+  }catch(e){ console.error(e); toast('Erro ao montar o RDO. Confira os dados e tente de novo.'); }
+  btn.disabled=false; btn.textContent='Gerar RDO em Excel';
+}
+
+var XLSX_MIME='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+async function deliverFile(name, blob, numero){
+  var file=null; try{ file=new File([blob],name,{type:XLSX_MIME}); }catch(e){}
+  if(file&&navigator.canShare&&navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file],title:name}); toast('RDO Nº '+numero+' pronto.'); return; }
+    catch(e){ if(e&&e.name==='AbortError'){ toast('Envio cancelado. O RDO continua salvo no app.'); return; } }
+  }
+  var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); },60000); toast('RDO Nº '+numero+' gerado: '+name);
+}
+
+// ---------- backup ----------
+function exportBackup(){
+  var data={app:'rdo',versao:1,exportadoEm:new Date().toISOString(),itens:{}};
+  try{ for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k.indexOf('rdo:')===0) data.itens[k]=localStorage.getItem(k); } }catch(e){}
+  var blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  var n='backup-rdo-'+todayISO()+'.json'; var file=null; try{ file=new File([blob],n,{type:'application/json'}); }catch(e){}
+  if(file&&navigator.canShare&&navigator.canShare({files:[file]})){ navigator.share({files:[file],title:n}).catch(function(){}); return; }
+  var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=n; document.body.appendChild(a); a.click(); a.remove();
+}
+function importBackup(f){
+  if(!f) return; var rd=new FileReader();
+  rd.onload=function(){ try{ var d=JSON.parse(rd.result); if(!d||d.app!=='rdo') throw 0; var n=0;
+      Object.keys(d.itens||{}).forEach(function(k){ if(k.indexOf('rdo:')===0){ localStorage.setItem(k,d.itens[k]); n++; } });
+      toast('Backup restaurado ('+n+' itens).'); setTimeout(function(){ location.reload(); },900);
+    }catch(e){ toast('Esse arquivo não é um backup do RDO.'); } };
+  rd.readAsText(f);
+}
+
+// ---------- history ----------
+async function renderHist(){
+  var host=$('#histList'); host.innerHTML='<p class="note">Carregando…</p>';
+  var list=await Store.list(); var days=Object.keys(list).sort().reverse();
+  if(!days.length){ host.innerHTML='<p class="note">Nenhum RDO salvo ainda. Preencha o dia na aba "Dia" e ele aparece aqui.</p>'; return; }
+  host.innerHTML=days.map(function(d){ var s=list[d]||{}; var dn=G.weekday(d);
+    return '<div class="hrow"><div class="grow"><div class="d">'+br(d)+' · Nº '+(rdoNumber(d)||'—')+'</div><div class="s">'+dn+' · '+(s.efetivo||0)+' pessoas · '+(s.atividades||0)+' atividades'+(s.clima?' · '+h(s.clima):'')+'</div></div>'+
+      '<button type="button" class="btn" data-open="'+d+'">Abrir</button><button type="button" class="btn dark" data-gen="'+d+'" aria-label="Gerar Excel de '+br(d)+'">Excel</button></div>';
+  }).join('');
+}
+$('#histList').addEventListener('click',async function(e){ var o=e.target.closest('[data-open]'); if(o){ await loadDay(o.dataset.open); showView('dia'); }
+  var g=e.target.closest('[data-gen]'); if(g){ var d=g.dataset.gen; var r=normRdo(await Store.getRdo(d),d); generate(r); } });
+
+// ---------- config ----------
+function renderCfg(){
+  $('#c-obra').value=cfg.obra||''; $('#c-inicio').value=cfg.inicio||''; $('#c-termino').value=cfg.termino||'';
+  $('#c-empresas').value=(cfg.empresas||[]).join('\n'); $('#c-equip').value=(cfg.equipamentos||[]).join('\n'); $('#c-fextra').value=(cfg.funcoesExtras||[]).join('\n');
+  ['elab','receb'].forEach(function(k){ var arr=cfg[k==='elab'?'elaboracao':'recebimento']||[]; var html='';
+    for(var i=0;i<4;i++){ var p=arr[i]||{}; html+='<input type="text" id="c-'+k+'-n'+i+'" placeholder="Nome" value="'+h(p.nome||'')+'"><input type="text" id="c-'+k+'-f'+i+'" placeholder="Função" value="'+h(p.funcao||'')+'">'; }
+    $('#c-'+k).innerHTML=html; });
+}
+$('#saveCfg').addEventListener('click',async function(){
+  function lines(id,max){ return $(id).value.split('\n').map(function(s){return s.trim();}).filter(Boolean).slice(0,max); }
+  function people(k){ var a=[]; for(var i=0;i<4;i++){ var n=$('#c-'+k+'-n'+i).value.trim(), f=$('#c-'+k+'-f'+i).value.trim(); if(n||f) a.push({nome:n,funcao:f}); } return a; }
+  cfg.obra=$('#c-obra').value.trim(); cfg.inicio=$('#c-inicio').value; cfg.termino=$('#c-termino').value;
+  cfg.empresas=lines('#c-empresas',G.LIMITS.empresas); cfg.equipamentos=lines('#c-equip',G.LIMITS.equipamentos); cfg.funcoesExtras=lines('#c-fextra',G.LIMITS.extrasRec);
+  cfg.elaboracao=people('elab'); cfg.recebimento=people('receb');
+  try{ await Store.saveConfig(cfg); toast('Dados da obra salvos.'); }catch(e){ toast('Salvo neste aparelho. Não consegui salvar na nuvem.'); }
+  updateHeader(); renderAll();
+});
+
+$('#expBk').addEventListener('click',exportBackup);
+$('#impBk').addEventListener('change',function(e){ importBackup(e.target.files[0]); });
+
+// ---------- navigation ----------
+function showView(v){ ['dia','hist','obra'].forEach(function(x){ $('#view-'+x).hidden=x!==v; $('#tab-'+x).setAttribute('aria-selected',String(x===v)); });
+  $('#bar').hidden=v!=='dia'; $('#daybar').hidden=v!=='dia'; if(v==='hist') renderHist(); if(v==='obra') renderCfg(); window.scrollTo(0,0); }
+$$('.tabs button').forEach(function(b){ b.addEventListener('click',function(){ showView(b.dataset.view); }); });
+async function loadDay(date){ if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; await doSave(); } rdo=normRdo(await Store.getRdo(date),date); $('#aiText').value=''; aiMsg(''); renderAll(); setSync(db?'nuvem conectada':'salvando neste aparelho'); }
+$('#dayInput').addEventListener('change',function(e){ if(e.target.value) loadDay(e.target.value); });
+$('#prevDay').addEventListener('click',function(){ loadDay(addDays(rdo.data,-1)); });
+$('#nextDay').addEventListener('click',function(){ loadDay(addDays(rdo.data,1)); });
+$('#aiBtn').addEventListener('click',fillAI);
+$('#aiApply').addEventListener('click',applyPasted);
+$('#aiReopen').addEventListener('click',openClaude);
+$('#copyPrev').addEventListener('click',copyPrev);
+$('#genBtn').addEventListener('click',function(){ if(saveTimer){ clearTimeout(saveTimer); doSave(); } generate(); });
+document.addEventListener('visibilitychange',function(){ if(document.hidden&&saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); } });
+
+// ---------- boot ----------
+if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
+try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+(async function boot(){
+  var c=LS.get('config'); if(c) cfg=Object.assign(clone(DEFAULT_CFG),c);
+  rdo=normRdo(LS.get('d:'+todayISO()),todayISO()); renderAll(); setSync('conectando…');
+  var cl=window.claude;
+  if(cl&&cl.use){
+    var res=await Promise.all([cl.use('db').catch(function(){return null;}), cl.use('downloads').catch(function(){return null;}), cl.use('sample').catch(function(){return null;})]);
+    db=res[0]; downloads=res[1]; sample=res[2];
+    if(sample){ try{ var lim=await sample.limits(); sampleImages=!!lim.images; }catch(e){} }
+  }
+  var rc=await Store.getConfig(); if(rc) cfg=Object.assign(clone(DEFAULT_CFG),rc);
+  rdo=normRdo(await Store.getRdo(rdo.data),rdo.data);
+  renderAll(); setSync('salvo no celular');
+})();
+})();
+</script>
+</body>
+</html>
