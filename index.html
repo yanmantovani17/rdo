@@ -165,6 +165,17 @@ html,body{margin:0}
 body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 .top{top:0;padding-top:env(safe-area-inset-top,0px)}
 .backup{display:flex;gap:8px;flex-wrap:wrap}
+.prod-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.prod-grid>*{min-width:0}
+.prod-qty{display:flex;gap:8px;align-items:center}
+.prod-qty input{font-family:var(--f-mono);font-weight:600;font-size:1.05rem}
+.prod-qty input{flex:1;min-width:0}
+.prod-qty .unsel{flex:none;width:8.5em}
+.cad{display:flex;flex-direction:column;gap:8px}
+.cad-list{display:flex;flex-direction:column;gap:6px}
+.cad-item{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:4px 4px 4px 12px;background:var(--surface-2)}
+.cad-item span{flex:1;min-width:0;overflow-wrap:anywhere}
+.cad-empty{font-size:.88rem;color:var(--muted);padding:4px 0}
 </style>
 </head>
 <body>
@@ -210,6 +221,11 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 
 <main class="wrap" id="view-hist" hidden>
   <h2 class="sheet-h">RDOs salvos</h2>
+  <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+    <strong style="font-family:var(--f-display);letter-spacing:.05em;text-transform:uppercase">Base para Power BI</strong>
+    <p class="note" style="margin:0">Uma planilha com todos os dias salvos, em tabelas prontas para o Power BI: Dias, Produção, Efetivo, Equipamentos e Clima. Salve sempre por cima do mesmo arquivo no OneDrive para o painel atualizar.</p>
+    <button type="button" class="btn pri" id="expBase">Exportar base (Excel)</button>
+  </div>
   <div class="hist" id="histList"></div>
 </main>
 
@@ -228,6 +244,18 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
     <div class="field"><span class="lbl">Elaboração (nome · função)</span><div class="resp" id="c-elab"></div></div>
     <div class="field"><span class="lbl">Recebimento (nome · função)</span><div class="resp" id="c-receb"></div></div>
     <button type="button" class="btn dark full" id="saveCfg">Salvar dados da obra</button>
+  </div>
+  <h2 class="sheet-h">Tipos de serviço</h2>
+  <p class="note">Cadastre os serviços que você quer acompanhar na produção. Eles aparecem como lista na seção Produção do dia.</p>
+  <div class="card cad" style="padding:14px">
+    <div class="cad-list" id="cadServ"></div>
+    <div class="row"><input type="text" id="newServ" class="grow" placeholder="Ex.: Cravação de estacas"><button type="button" class="btn dark" id="addServ">Adicionar</button></div>
+  </div>
+  <h2 class="sheet-h">Unidades</h2>
+  <p class="note">Unidades de medida usadas na produção.</p>
+  <div class="card cad" style="padding:14px">
+    <div class="cad-list" id="cadUnid"></div>
+    <div class="row"><input type="text" id="newUnid" class="grow" placeholder="Ex.: m³"><button type="button" class="btn dark" id="addUnid">Adicionar</button></div>
   </div>
   <h2 class="sheet-h">Backup</h2>
   <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
@@ -263,13 +291,14 @@ var DEFAULT_CFG = {
   empresas:['Libercon Engenharia','Libercon Construções','LHM','Globall','Império Construções','Perfurac','Stack','Geositu','J2R','Alphageos','Roll-on','Geocoring','Premovale','TNG'],
   equipamentos:['Gerador','Máquina de compactação dinâmica','Retroescavadeira','Escavadeira','Caminhão','Munck','Motoniveladora','Rolo compactador liso','Rolo compactador pé de carneiro','Guindaste','Plataforma elevatória articulada','Bate-estaca'],
   funcoesExtras:[], funcoesVisExtras:[],
+  servicos:[], unidades:['m³','m²','m','un','kg','t','h','vb'],
   elaboracao:[], recebimento:[]
 };
 var PERIODS=[['manha','Manhã'],['tarde','Tarde'],['noite','Noite']];
 
 function blankRdo(date){
   return {data:date, clima:{manha:{},tarde:{},noite:{}}, mm:'', paralisacao:new Array(24).fill(false),
-    efetivo:{}, visitantes:[], equip:{}, atividades:[], ocorrencias:'', comLibercon:'', comCliente:'', fotos:[], updatedAt:0};
+    efetivo:{}, visitantes:[], equip:{}, atividades:[], producao:[], ocorrencias:'', comLibercon:'', comCliente:'', fotos:[], updatedAt:0};
 }
 function normRdo(r, date){
   var b=blankRdo(date); r=r||{};
@@ -322,7 +351,7 @@ var photoURLs={};
 
 function totalEfetivo(r){ var t=0; Object.keys(r.efetivo||{}).forEach(function(e){ var q=r.efetivo[e]||{}; Object.keys(q).forEach(function(f){ t+=(+q[f]||0); }); }); return t; }
 function summaryOf(r){ if(!r) return {}; var ativ=(r.atividades||[]).filter(function(a){return a.desc;}).length;
-  return {efetivo:totalEfetivo(r), atividades:ativ, fotos:(r.fotos||[]).length, clima:[r.clima&&r.clima.manha&&r.clima.manha.cond, r.clima&&r.clima.tarde&&r.clima.tarde.cond].filter(Boolean).join('/'), updatedAt:r.updatedAt||0}; }
+  return {efetivo:totalEfetivo(r), atividades:ativ, producao:(r.producao||[]).filter(function(p){ return +p.producao>0; }).length, fotos:(r.fotos||[]).length, clima:[r.clima&&r.clima.manha&&r.clima.manha.cond, r.clima&&r.clima.tarde&&r.clima.tarde.cond].filter(Boolean).join('/'), updatedAt:r.updatedAt||0}; }
 function rdoNumber(date){ var a=G.serial(date), b=G.serial(cfg.inicio); return (a&&b)? a-b+1 : null; }
 
 var saveTimer=null;
@@ -340,6 +369,7 @@ function done(key){
     case 'visit': return (r.visitantes||[]).some(function(v){ return v.empresa; });
     case 'equip': return Object.keys(r.equip||{}).some(function(k){ return (+r.equip[k].qtd||0)>0; });
     case 'ativ': return (r.atividades||[]).some(function(a){ return a.desc; });
+    case 'prod': return (r.producao||[]).some(function(p){ return +p.producao>0; });
     case 'ocorr': return !!(r.ocorrencias||r.comLibercon);
     case 'fotos': return (r.fotos||[]).length>0;
   }
@@ -350,6 +380,7 @@ var SECTIONS=[
   ['visit','Visitantes',function(){ var n=0; rdo.visitantes.forEach(function(v){ Object.keys(v.q||{}).forEach(function(f){ n+=(+v.q[f]||0); }); }); return n? n+' visitante(s)':'nenhum'; }, renderVisit],
   ['equip','Equipamentos',function(){ var n=0; Object.keys(rdo.equip).forEach(function(k){ n+=(+rdo.equip[k].qtd||0); }); return n+' em obra'; }, renderEquip],
   ['ativ','Atividades',function(){ return rdo.atividades.filter(function(a){return a.desc;}).length+' registrada(s)'; }, renderAtiv],
+  ['prod','Produção',function(){ var n=(rdo.producao||[]).filter(function(p){ return +p.producao>0; }).length; return n? n+' serviço(s)' : 'sem produção'; }, renderProd],
   ['ocorr','Ocorrências',function(){ return rdo.ocorrencias? 'preenchido':'vazio'; }, renderOcorr],
   ['fotos','Fotos',function(){ return rdo.fotos.length+' de '+G.LIMITS.fotos; }, renderFotos]
 ];
@@ -462,6 +493,34 @@ function renderAtiv(b){
   b.addEventListener('change',function(e){ if(e.target.dataset.aemp!==undefined){ rdo.atividades[+e.target.dataset.aemp].empresa=e.target.value; changed('ativ'); } });
 }
 
+function servicosList(){ var l=(cfg.servicos||[]).slice(); (rdo.producao||[]).forEach(function(p){ if(p.servico&&l.indexOf(p.servico)<0) l.push(p.servico); }); return l; }
+function unidadesList(){ var l=(cfg.unidades||[]).slice(); (rdo.producao||[]).forEach(function(p){ if(p.unidade&&l.indexOf(p.unidade)<0) l.push(p.unidade); }); return l; }
+function optList(list, val, ph){ return '<option value="">'+h(ph)+'</option>'+list.map(function(x){ return '<option'+(x===val?' selected':'')+'>'+h(x)+'</option>'; }).join(''); }
+function lastUnitFor(serv){ var u=''; (rdo.producao||[]).forEach(function(p){ if(p.servico===serv&&p.unidade) u=p.unidade; }); return u || ((cfg.servUnid||{})[serv]||''); }
+function renderProd(b){
+  rdo.producao=rdo.producao||[];
+  var html='';
+  if(!(cfg.servicos||[]).length) html+='<p class="note">Nenhum tipo de serviço cadastrado ainda. Cadastre na aba <b>Obra → Tipos de serviço</b>.</p>';
+  html+=rdo.producao.map(function(p,i){
+    return '<div class="item"><div class="item-h"><span class="n">'+(i+1)+'</span><select data-pemp="'+i+'" class="grow" aria-label="Empresa">'+optList(empresasOrdem(),p.empresa,'Empresa…')+'</select><button type="button" class="x" data-pdel="'+i+'" aria-label="Remover">×</button></div>'+
+      '<select data-pserv="'+i+'" aria-label="Tipo de serviço">'+optList(servicosList(),p.servico,'Tipo de serviço…')+'</select>'+
+      '<div class="prod-qty"><input type="number" inputmode="decimal" step="any" min="0" data-pqtd="'+i+'" value="'+h(p.producao)+'" placeholder="Produção" aria-label="Produção">'+
+      '<select data-punid="'+i+'" aria-label="Unidade" class="unsel">'+optList(unidadesList(),p.unidade,'Unidade')+'</select></div></div>';
+  }).join('');
+  html+='<button type="button" class="btn ghost" id="addProd">+ Produção</button>';
+  b.innerHTML=html;
+  b.addEventListener('click',function(e){
+    if(e.target.dataset.pdel!==undefined){ rdo.producao.splice(+e.target.dataset.pdel,1); rerender('prod'); touch(); }
+    if(e.target.id==='addProd'){ var last=rdo.producao[rdo.producao.length-1]; rdo.producao.push({empresa:last?last.empresa:'',servico:'',unidade:'',producao:''}); rerender('prod'); touch(); }
+  });
+  b.addEventListener('change',function(e){ var d=e.target.dataset;
+    if(d.pemp!==undefined){ rdo.producao[+d.pemp].empresa=e.target.value; changed('prod'); }
+    if(d.pserv!==undefined){ var it=rdo.producao[+d.pserv]; it.servico=e.target.value; if(!it.unidade){ var u=lastUnitFor(it.servico); if(u){ it.unidade=u; rerender('prod'); } } changed('prod'); }
+    if(d.punid!==undefined){ var it2=rdo.producao[+d.punid]; it2.unidade=e.target.value; if(it2.servico){ cfg.servUnid=cfg.servUnid||{}; if(cfg.servUnid[it2.servico]!==it2.unidade){ cfg.servUnid[it2.servico]=it2.unidade; Store.saveConfig(cfg); } } changed('prod'); }
+  });
+  b.addEventListener('input',function(e){ if(e.target.dataset.pqtd!==undefined){ rdo.producao[+e.target.dataset.pqtd].producao=e.target.value; changed('prod'); } });
+}
+
 function renderOcorr(b){
   b.innerHTML='<label class="field"><span class="lbl">Ocorrências</span><textarea id="t-ocorr" rows="4" placeholder="Fatos relevantes: acidentes, fiscalizações, falta de material, interferências…">'+h(rdo.ocorrencias)+'</textarea></label>'+
     '<label class="field"><span class="lbl">Comentários Libercon</span><textarea id="t-lib" rows="3">'+h(rdo.comLibercon)+'</textarea></label>'+
@@ -510,9 +569,10 @@ async function fillAI(){
     'condicoes: '+JSON.stringify(G.CONDICOES),'status: '+JSON.stringify(G.STATUS),
     'empresas: '+JSON.stringify(empresasOrdem()),'funcoes_efetivo: '+JSON.stringify(recFuncs().map(function(f){return f.replace(/\s+/g,' ');})),
     'funcoes_visitantes: '+JSON.stringify(G.FUNC_VIS),'equipamentos: '+JSON.stringify(equipOrdem()),
+    'servicos_producao: '+JSON.stringify(cfg.servicos||[]),'unidades: '+JSON.stringify(cfg.unidades||[]),
     'Formato:',
-    '{"clima":{"manha":{"cond":"","status":"","obs":""},"tarde":{...},"noite":{...}},"mm":0,"paralisacao_horas":[14,15],"efetivo":[{"empresa":"","funcao":"","qtd":0}],"visitantes":[{"empresa":"","funcao":"","qtd":0}],"equipamentos":[{"desc":"","qtd":0,"obs":""}],"atividades":[{"empresa":"","desc":""}],"ocorrencias":"","comLibercon":""}',
-    'Regras: status "Sem impactos" quando o clima não atrapalhou; "Paralisado" quando parou; "Parcialmente Impactado" quando atrapalhou parte. paralisacao_horas = horas cheias (0-23) em que o trabalho parou; "das 14h às 16h" = [14,15]. Se a empresa/função/equipamento não estiver na lista, use o nome como foi dito. Funções genéricas como "ajudante", "servente", "pedreiro" mapeiam para a função da lista. Atividades: frases técnicas curtas, uma por item, com a empresa responsável. Ocorrências: só fatos relevantes (chuva forte, acidente, fiscalização, falta de material). Escreva em português formal de relatório.',
+    '{"clima":{"manha":{"cond":"","status":"","obs":""},"tarde":{...},"noite":{...}},"mm":0,"paralisacao_horas":[14,15],"efetivo":[{"empresa":"","funcao":"","qtd":0}],"visitantes":[{"empresa":"","funcao":"","qtd":0}],"equipamentos":[{"desc":"","qtd":0,"obs":""}],"atividades":[{"empresa":"","desc":""}],"producao":[{"empresa":"","servico":"","unidade":"","quantidade":0}],"ocorrencias":"","comLibercon":""}',
+    'Regras: status "Sem impactos" quando o clima não atrapalhou; "Paralisado" quando parou; "Parcialmente Impactado" quando atrapalhou parte. paralisacao_horas = horas cheias (0-23) em que o trabalho parou; "das 14h às 16h" = [14,15]. Se a empresa/função/equipamento não estiver na lista, use o nome como foi dito. Funções genéricas como "ajudante", "servente", "pedreiro" mapeiam para a função da lista. Atividades: frases técnicas curtas, uma por item, com a empresa responsável. producao: só quando o relato disser QUANTO foi produzido; servico e unidade devem ser da lista (servicos_producao, unidades). Ocorrências: só fatos relevantes (chuva forte, acidente, fiscalização, falta de material). Escreva em português formal de relatório.',
     'RELATO:', txt].join('\n');
   if(!sample){ btn.disabled=false; btn.textContent='Preencher com IA'; aiViaClaude(prompt); return; }
   try{
@@ -539,6 +599,13 @@ function applyAI(r){
       rdo.equip[name]=Object.assign({qtd:0,obs:''},rdo.equip[name],{qtd:Math.max(0,+q.qtd||0)}, q.obs?{obs:q.obs}:{}); }); log.push(r.equipamentos.length+' equipamento(s)'); }
   if(Array.isArray(r.atividades)&&r.atividades.length){ rdo.atividades=rdo.atividades.filter(function(a){ return a.desc; }); var k=0; r.atividades.forEach(function(a){ if(!a.desc||rdo.atividades.length>=G.LIMITS.atividades) return; if(rdo.atividades.some(function(x){ return x.desc===a.desc; })) return;
       var emp=empresasOrdem().find(function(x){ return x.toLowerCase().trim()===String(a.empresa||'').toLowerCase().trim(); })||a.empresa||''; rdo.atividades.push({empresa:emp,desc:a.desc}); k++; }); if(k) log.push(k+' atividade(s)'); }
+  if(Array.isArray(r.producao)&&r.producao.length){ rdo.producao=(rdo.producao||[]).filter(function(x){ return x.servico||x.producao; }); var np=0;
+    r.producao.forEach(function(x){ if(!x.servico) return; var emp=empresasOrdem().find(function(e){ return e.toLowerCase().trim()===String(x.empresa||'').toLowerCase().trim(); })||x.empresa||'';
+      var sv=(cfg.servicos||[]).find(function(e){ return e.toLowerCase()===String(x.servico).toLowerCase(); })||x.servico;
+      var un=(cfg.unidades||[]).find(function(e){ return e.toLowerCase()===String(x.unidade||'').toLowerCase(); })||x.unidade||lastUnitFor(sv);
+      var row=rdo.producao.find(function(p){ return p.empresa===emp&&p.servico===sv; });
+      if(row){ row.unidade=row.unidade||un; row.producao=String(x.quantidade==null?'':x.quantidade); } else rdo.producao.push({empresa:emp,servico:sv,unidade:un,producao:String(x.quantidade==null?'':x.quantidade)}); np++; });
+    if(np) log.push(np+' produção(ões)'); }
   if(r.ocorrencias){ rdo.ocorrencias= rdo.ocorrencias? rdo.ocorrencias+'\n'+r.ocorrencias : r.ocorrencias; log.push('ocorrências'); }
   if(r.comLibercon){ rdo.comLibercon= rdo.comLibercon? rdo.comLibercon+'\n'+r.comLibercon : r.comLibercon; log.push('comentários'); }
   if(cfgDirty){ cfgDirty=false; Store.saveConfig(cfg); }
@@ -575,7 +642,8 @@ async function copyPrev(){
   if(!prev){ toast('Não há RDO anterior salvo.'); return; }
   var p=normRdo(await Store.getRdo(prev),prev);
   rdo.efetivo=clone(p.efetivo); rdo.equip=clone(p.equip); rdo.atividades=clone(p.atividades); rdo.visitantes=clone(p.visitantes||[]);
-  renderAll(); touch(); toast('Copiado de '+br(prev)+': efetivo, equipamentos e atividades. Ajuste o que mudou.');
+  rdo.producao=(p.producao||[]).filter(function(x){ return x.servico; }).map(function(x){ return {empresa:x.empresa,servico:x.servico,unidade:x.unidade,producao:''}; });
+  renderAll(); touch(); toast('Copiado de '+br(prev)+': efetivo, equipamentos, atividades e serviços da produção (sem as quantidades). Ajuste o que mudou.');
 }
 
 // ---------- generate ----------
@@ -628,13 +696,80 @@ function importBackup(f){
   rd.readAsText(f);
 }
 
+// ---------- base para Power BI ----------
+function xmlEsc(t){ return String(t).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function colL(n){ var s=''; while(n>0){ var m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
+// tables: [{name, cols:[{h, t:'s'|'n'|'d'}], rows:[[...]]}]
+async function buildXlsx(tables){
+  var z=new JSZip();
+  var ct='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
+  var wb='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>';
+  var rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+  tables.forEach(function(t,i){
+    var n=i+1; ct+='<Override PartName="/xl/worksheets/sheet'+n+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+    wb+='<sheet name="'+xmlEsc(t.name)+'" sheetId="'+n+'" r:id="rId'+n+'"/>';
+    rels+='<Relationship Id="rId'+n+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+n+'.xml"/>';
+    var last=colL(t.cols.length)+(t.rows.length+1);
+    var x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>'+
+      t.cols.map(function(c,j){ return '<col min="'+(j+1)+'" max="'+(j+1)+'" width="'+(c.w||16)+'" customWidth="1"/>'; }).join('')+'</cols><sheetData>';
+    x+='<row r="1">'+t.cols.map(function(c,j){ return '<c r="'+colL(j+1)+'1" s="1" t="inlineStr"><is><t>'+xmlEsc(c.h)+'</t></is></c>'; }).join('')+'</row>';
+    t.rows.forEach(function(row,ri){ var r=ri+2; x+='<row r="'+r+'">';
+      row.forEach(function(v,j){ var ref=colL(j+1)+r, ty=t.cols[j].t;
+        if(v===null||v===undefined||v==='') return;
+        if(ty==='d') x+='<c r="'+ref+'" s="2"><v>'+G.serial(v)+'</v></c>';
+        else if(ty==='n'){ var num=Number(v); if(isFinite(num)) x+='<c r="'+ref+'"><v>'+num+'</v></c>'; }
+        else x+='<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEsc(v)+'</t></is></c>';
+      }); x+='</row>'; });
+    x+='</sheetData><autoFilter ref="A1:'+last+'"/></worksheet>';
+    z.file('xl/worksheets/sheet'+n+'.xml',x);
+  });
+  ct+='</Types>'; wb+='</sheets></workbook>';
+  rels+='<Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>';
+  z.file('[Content_Types].xml',ct);
+  z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+  z.file('xl/workbook.xml',wb); z.file('xl/_rels/workbook.xml.rels',rels);
+  z.file('xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="3"><xf/><xf fontId="1" applyFont="1"/><xf numFmtId="14" applyNumberFormat="1"/></cellXfs></styleSheet>');
+  return z.generateAsync({type:'blob',compression:'DEFLATE',mimeType:XLSX_MIME});
+}
+async function exportBase(){
+  var btn=$('#expBase'); btn.disabled=true; btn.textContent='Montando a base…';
+  try{
+    var list=await Store.list(); var days=Object.keys(list).sort();
+    if(!days.length){ toast('Nenhum RDO salvo ainda.'); return; }
+    var jornada=+cfg.jornada||9;
+    var T={dias:[],prod:[],efet:[],equip:[],clima:[]};
+    for(var i=0;i<days.length;i++){ var d=days[i]; var r=normRdo(await Store.getRdo(d),d);
+      var hp=r.paralisacao.filter(Boolean).length, ef=totalEfetivo(r), eqTot=0;
+      Object.keys(r.equip||{}).forEach(function(k){ var q=+(r.equip[k].qtd)||0; eqTot+=q; if(q) T.equip.push([d,k,q,r.equip[k].obs||'']); });
+      Object.keys(r.efetivo||{}).forEach(function(e){ var q=r.efetivo[e]||{}; Object.keys(q).forEach(function(f){ var n=+q[f]||0; if(n) T.efet.push([d,e,f.replace(/\s+/g,' '),n]); }); });
+      (r.producao||[]).forEach(function(p){ if(p.servico&&+p.producao>0) T.prod.push([d,p.empresa||'',p.servico||'',p.unidade||'',+p.producao||0]); });
+      PERIODS.forEach(function(pp){ var c=r.clima[pp[0]]||{}; T.clima.push([d,pp[1],c.cond||'',c.status||'',c.obs||'']); });
+      T.dias.push([d,rdoNumber(d),G.weekday(d),ef,eqTot,+String(r.mm).replace(',','.')||0,hp,(r.producao||[]).filter(function(p){ return +p.producao>0; }).length,
+        (r.clima.manha.status==='Paralisado'&&r.clima.tarde.status==='Paralisado')?'Sim':'Não']);
+    }
+    var blob=await buildXlsx([
+      {name:'Dias',cols:[{h:'Data',t:'d',w:12},{h:'RDO_N',t:'n',w:8},{h:'Dia_semana',t:'s',w:14},{h:'Efetivo_total',t:'n',w:13},{h:'Equipamentos_total',t:'n',w:18},{h:'Chuva_mm',t:'n',w:10},{h:'Horas_paradas',t:'n',w:14},{h:'Servicos_com_producao',t:'n',w:20},{h:'Dia_paralisado',t:'s',w:14}],rows:T.dias},
+      {name:'Producao',cols:[{h:'Data',t:'d',w:12},{h:'Empresa',t:'s',w:24},{h:'Servico',t:'s',w:32},{h:'Unidade',t:'s',w:10},{h:'Producao',t:'n',w:12}],rows:T.prod},
+      {name:'Efetivo',cols:[{h:'Data',t:'d',w:12},{h:'Empresa',t:'s',w:24},{h:'Funcao',t:'s',w:28},{h:'Quantidade',t:'n',w:12}],rows:T.efet},
+      {name:'Equipamentos',cols:[{h:'Data',t:'d',w:12},{h:'Equipamento',t:'s',w:32},{h:'Quantidade',t:'n',w:12},{h:'Frente_obs',t:'s',w:30}],rows:T.equip},
+      {name:'Clima',cols:[{h:'Data',t:'d',w:12},{h:'Periodo',t:'s',w:10},{h:'Condicao',t:'s',w:12},{h:'Status',t:'s',w:22},{h:'Observacao',t:'s',w:30}],rows:T.clima}
+    ]);
+    var name='BASE RDO - '+(cfg.obra||'OBRA').replace(/[\\/:*?"<>|]/g,'')+'.xlsx';
+    var file=null; try{ file=new File([blob],name,{type:XLSX_MIME}); }catch(e){}
+    if(file&&navigator.canShare&&navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:name}); toast('Base exportada: '+days.length+' dia(s).'); return; }catch(e){ if(e&&e.name==='AbortError'){ toast('Exportação cancelada.'); return; } } }
+    var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(url); },60000);
+    toast('Base exportada: '+days.length+' dia(s).');
+  }catch(e){ console.error(e); toast('Não consegui montar a base. Tente de novo.'); }
+  finally{ btn.disabled=false; btn.textContent='Exportar base (Excel)'; }
+}
+
 // ---------- history ----------
 async function renderHist(){
   var host=$('#histList'); host.innerHTML='<p class="note">Carregando…</p>';
   var list=await Store.list(); var days=Object.keys(list).sort().reverse();
   if(!days.length){ host.innerHTML='<p class="note">Nenhum RDO salvo ainda. Preencha o dia na aba "Dia" e ele aparece aqui.</p>'; return; }
   host.innerHTML=days.map(function(d){ var s=list[d]||{}; var dn=G.weekday(d);
-    return '<div class="hrow"><div class="grow"><div class="d">'+br(d)+' · Nº '+(rdoNumber(d)||'—')+'</div><div class="s">'+dn+' · '+(s.efetivo||0)+' pessoas · '+(s.atividades||0)+' atividades'+(s.clima?' · '+h(s.clima):'')+'</div></div>'+
+    return '<div class="hrow"><div class="grow"><div class="d">'+br(d)+' · Nº '+(rdoNumber(d)||'—')+'</div><div class="s">'+dn+' · '+(s.efetivo||0)+' pessoas · '+(s.atividades||0)+' atividades'+(s.producao?' · '+s.producao+' produção':'')+(s.clima?' · '+h(s.clima):'')+'</div></div>'+
       '<button type="button" class="btn" data-open="'+d+'">Abrir</button><button type="button" class="btn dark" data-gen="'+d+'" aria-label="Gerar Excel de '+br(d)+'">Excel</button></div>';
   }).join('');
 }
@@ -659,12 +794,31 @@ $('#saveCfg').addEventListener('click',async function(){
   updateHeader(); renderAll();
 });
 
+function renderCad(){
+  [['servicos','#cadServ','Nenhum serviço cadastrado.'],['unidades','#cadUnid','Nenhuma unidade cadastrada.']].forEach(function(c){
+    var list=cfg[c[0]]||[];
+    $(c[1]).innerHTML= list.length? list.map(function(x,i){ return '<div class="cad-item"><span>'+h(x)+'</span><button type="button" class="x" data-cdel="'+c[0]+'" data-ci="'+i+'" aria-label="Remover '+h(x)+'">×</button></div>'; }).join('') : '<div class="cad-empty">'+c[2]+'</div>';
+  });
+}
+function addCad(key, inputSel){
+  var inp=$(inputSel), v=inp.value.trim(); if(!v) return;
+  cfg[key]=cfg[key]||[];
+  if(cfg[key].some(function(x){ return x.toLowerCase()===v.toLowerCase(); })){ toast('"'+v+'" já está cadastrado.'); return; }
+  cfg[key].push(v); inp.value=''; Store.saveConfig(cfg); renderCad(); toast('Cadastrado: '+v); inp.focus();
+}
+$('#addServ').addEventListener('click',function(){ addCad('servicos','#newServ'); });
+$('#addUnid').addEventListener('click',function(){ addCad('unidades','#newUnid'); });
+$('#newServ').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); addCad('servicos','#newServ'); } });
+$('#newUnid').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); addCad('unidades','#newUnid'); } });
+document.addEventListener('click',function(e){ var d=e.target.closest('[data-cdel]'); if(!d) return; var k=d.dataset.cdel; cfg[k].splice(+d.dataset.ci,1); Store.saveConfig(cfg); renderCad(); });
+
 $('#expBk').addEventListener('click',exportBackup);
+$('#expBase').addEventListener('click',exportBase);
 $('#impBk').addEventListener('change',function(e){ importBackup(e.target.files[0]); });
 
 // ---------- navigation ----------
 function showView(v){ ['dia','hist','obra'].forEach(function(x){ $('#view-'+x).hidden=x!==v; $('#tab-'+x).setAttribute('aria-selected',String(x===v)); });
-  $('#bar').hidden=v!=='dia'; $('#daybar').hidden=v!=='dia'; if(v==='hist') renderHist(); if(v==='obra') renderCfg(); window.scrollTo(0,0); }
+  $('#bar').hidden=v!=='dia'; $('#daybar').hidden=v!=='dia'; if(v==='hist') renderHist(); if(v==='obra'){ renderCfg(); renderCad(); } window.scrollTo(0,0); }
 $$('.tabs button').forEach(function(b){ b.addEventListener('click',function(){ showView(b.dataset.view); }); });
 async function loadDay(date){ if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; await doSave(); } rdo=normRdo(await Store.getRdo(date),date); $('#aiText').value=''; aiMsg(''); renderAll(); setSync(db?'nuvem conectada':'salvando neste aparelho'); }
 $('#dayInput').addEventListener('change',function(e){ if(e.target.value) loadDay(e.target.value); });
