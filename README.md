@@ -15,3 +15,6 @@ App de celular para preencher as 67 FVS da Libercon, controlar os reparos (verif
 **Abrir / instalar:** https://yanmantovani17.github.io/rdo/fvs/
 
 No iPhone: abra no Safari → Compartilhar → "Adicionar à Tela de Início".
+
+## Google Sheets / Power BI
+O script `google-sheets/Codigo.gs` vai na planilha (Extensões → Apps Script) e recebe os RDOs enviados pelo app nas abas Dias, Producao, Efetivo, Equipamentos e Clima.

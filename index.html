@@ -222,9 +222,9 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 <main class="wrap" id="view-hist" hidden>
   <h2 class="sheet-h">RDOs salvos</h2>
   <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
-    <strong style="font-family:var(--f-display);letter-spacing:.05em;text-transform:uppercase">Base para Power BI</strong>
-    <p class="note" style="margin:0">Uma planilha com todos os dias salvos, em tabelas prontas para o Power BI: Dias, Produção, Efetivo, Equipamentos e Clima. Salve sempre por cima do mesmo arquivo no OneDrive para o painel atualizar.</p>
-    <button type="button" class="btn pri" id="expBase">Exportar base (Excel)</button>
+    <strong style="font-family:var(--f-display);letter-spacing:.05em;text-transform:uppercase">Google Sheets · Power BI</strong>
+    <p class="note" style="margin:0" id="gsHistStatus">Cada RDO salvo vai sozinho para a planilha do Google. Configure o endereço na aba Obra.</p>
+    <button type="button" class="btn pri" id="gsSendAll">Enviar todos os dias agora</button>
   </div>
   <div class="hist" id="histList"></div>
 </main>
@@ -256,6 +256,13 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
   <div class="card cad" style="padding:14px">
     <div class="cad-list" id="cadUnid"></div>
     <div class="row"><input type="text" id="newUnid" class="grow" placeholder="Ex.: m³"><button type="button" class="btn dark" id="addUnid">Adicionar</button></div>
+  </div>
+  <h2 class="sheet-h">Google Sheets</h2>
+  <p class="note">Endereço do script instalado na planilha (termina em <b>/exec</b>). Com ele configurado, cada RDO salvo é enviado para as abas Dias, Producao, Efetivo, Equipamentos e Clima. Sem internet, o app guarda e envia depois.</p>
+  <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+    <label class="field"><span class="lbl">Endereço do App da Web</span><input type="text" id="gsUrl" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <div class="row"><button type="button" class="btn dark grow" id="gsSave">Salvar e testar</button></div>
+    <div id="gsStatus" class="msg" hidden></div>
   </div>
   <h2 class="sheet-h">Backup</h2>
   <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
@@ -356,7 +363,7 @@ function rdoNumber(date){ var a=G.serial(date), b=G.serial(cfg.inicio); return (
 
 var saveTimer=null;
 function touch(){ rdo.updatedAt=Date.now(); setSync('salvando…'); clearTimeout(saveTimer); saveTimer=setTimeout(doSave,700); updateProgress(); }
-async function doSave(){ try{ await Store.saveRdo(clone(rdo)); setSync(db?'salvo na nuvem':'salvo neste aparelho'); }catch(e){ setSync('salvo neste aparelho'); } }
+async function doSave(){ try{ await Store.saveRdo(clone(rdo)); setSync('salvo no celular'); }catch(e){ setSync('salvo no celular'); } gsMark(rdo.data); }
 function setSync(t){ $('#sync').textContent=t; }
 var toastTimer; function toast(t){ var el=$('#toast'); el.textContent=t; el.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(function(){ el.hidden=true; },3200); }
 
@@ -696,71 +703,72 @@ function importBackup(f){
   rd.readAsText(f);
 }
 
-// ---------- base para Power BI ----------
-function xmlEsc(t){ return String(t).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function colL(n){ var s=''; while(n>0){ var m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
-// tables: [{name, cols:[{h, t:'s'|'n'|'d'}], rows:[[...]]}]
-async function buildXlsx(tables){
-  var z=new JSZip();
-  var ct='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
-  var wb='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>';
-  var rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
-  tables.forEach(function(t,i){
-    var n=i+1; ct+='<Override PartName="/xl/worksheets/sheet'+n+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
-    wb+='<sheet name="'+xmlEsc(t.name)+'" sheetId="'+n+'" r:id="rId'+n+'"/>';
-    rels+='<Relationship Id="rId'+n+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+n+'.xml"/>';
-    var last=colL(t.cols.length)+(t.rows.length+1);
-    var x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>'+
-      t.cols.map(function(c,j){ return '<col min="'+(j+1)+'" max="'+(j+1)+'" width="'+(c.w||16)+'" customWidth="1"/>'; }).join('')+'</cols><sheetData>';
-    x+='<row r="1">'+t.cols.map(function(c,j){ return '<c r="'+colL(j+1)+'1" s="1" t="inlineStr"><is><t>'+xmlEsc(c.h)+'</t></is></c>'; }).join('')+'</row>';
-    t.rows.forEach(function(row,ri){ var r=ri+2; x+='<row r="'+r+'">';
-      row.forEach(function(v,j){ var ref=colL(j+1)+r, ty=t.cols[j].t;
-        if(v===null||v===undefined||v==='') return;
-        if(ty==='d') x+='<c r="'+ref+'" s="2"><v>'+G.serial(v)+'</v></c>';
-        else if(ty==='n'){ var num=Number(v); if(isFinite(num)) x+='<c r="'+ref+'"><v>'+num+'</v></c>'; }
-        else x+='<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEsc(v)+'</t></is></c>';
-      }); x+='</row>'; });
-    x+='</sheetData><autoFilter ref="A1:'+last+'"/></worksheet>';
-    z.file('xl/worksheets/sheet'+n+'.xml',x);
-  });
-  ct+='</Types>'; wb+='</sheets></workbook>';
-  rels+='<Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>';
-  z.file('[Content_Types].xml',ct);
-  z.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
-  z.file('xl/workbook.xml',wb); z.file('xl/_rels/workbook.xml.rels',rels);
-  z.file('xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="3"><xf/><xf fontId="1" applyFont="1"/><xf numFmtId="14" applyNumberFormat="1"/></cellXfs></styleSheet>');
-  return z.generateAsync({type:'blob',compression:'DEFLATE',mimeType:XLSX_MIME});
+// ---------- Google Sheets (Power BI) ----------
+function dayTables(r){
+  var T={Dias:[],Producao:[],Efetivo:[],Equipamentos:[],Clima:[]};
+  var hp=r.paralisacao.filter(Boolean).length, eqTot=0;
+  Object.keys(r.equip||{}).forEach(function(k){ var q=+(r.equip[k].qtd)||0; eqTot+=q; if(q) T.Equipamentos.push([k,q,r.equip[k].obs||'']); });
+  Object.keys(r.efetivo||{}).forEach(function(e){ var q=r.efetivo[e]||{}; Object.keys(q).forEach(function(f){ var n=+q[f]||0; if(n) T.Efetivo.push([e,f.replace(/\s+/g,' '),n]); }); });
+  (r.producao||[]).forEach(function(p){ if(p.servico&&+p.producao>0) T.Producao.push([p.empresa||'',p.servico,p.unidade||'',+p.producao]); });
+  PERIODS.forEach(function(pp){ var c=r.clima[pp[0]]||{}; if(c.cond||c.status||c.obs) T.Clima.push([pp[1],c.cond||'',c.status||'',c.obs||'']); });
+  T.Dias.push([rdoNumber(r.data)||'',G.weekday(r.data),totalEfetivo(r),eqTot,+String(r.mm).replace(',','.')||0,hp,T.Producao.length,
+    (r.clima.manha.status==='Paralisado'&&r.clima.tarde.status==='Paralisado')?'Sim':'Não', r.updatedAt||Date.now()]);
+  return T;
 }
-async function exportBase(){
-  var btn=$('#expBase'); btn.disabled=true; btn.textContent='Montando a base…';
+function gsQueue(){ return LS.get('gsfila')||[]; }
+function gsSetQueue(q){ LS.set('gsfila',q); }
+function gsMark(date){ if(!cfg.gsUrl) return; var q=gsQueue(); if(q.indexOf(date)<0){ q.push(date); gsSetQueue(q); } clearTimeout(gsTimer); gsTimer=setTimeout(gsFlush,4000); }
+var gsTimer=null, gsBusy=false;
+async function gsPost(payload){
+  var body=JSON.stringify(payload);
   try{
-    var list=await Store.list(); var days=Object.keys(list).sort();
-    if(!days.length){ toast('Nenhum RDO salvo ainda.'); return; }
-    var jornada=+cfg.jornada||9;
-    var T={dias:[],prod:[],efet:[],equip:[],clima:[]};
-    for(var i=0;i<days.length;i++){ var d=days[i]; var r=normRdo(await Store.getRdo(d),d);
-      var hp=r.paralisacao.filter(Boolean).length, ef=totalEfetivo(r), eqTot=0;
-      Object.keys(r.equip||{}).forEach(function(k){ var q=+(r.equip[k].qtd)||0; eqTot+=q; if(q) T.equip.push([d,k,q,r.equip[k].obs||'']); });
-      Object.keys(r.efetivo||{}).forEach(function(e){ var q=r.efetivo[e]||{}; Object.keys(q).forEach(function(f){ var n=+q[f]||0; if(n) T.efet.push([d,e,f.replace(/\s+/g,' '),n]); }); });
-      (r.producao||[]).forEach(function(p){ if(p.servico&&+p.producao>0) T.prod.push([d,p.empresa||'',p.servico||'',p.unidade||'',+p.producao||0]); });
-      PERIODS.forEach(function(pp){ var c=r.clima[pp[0]]||{}; T.clima.push([d,pp[1],c.cond||'',c.status||'',c.obs||'']); });
-      T.dias.push([d,rdoNumber(d),G.weekday(d),ef,eqTot,+String(r.mm).replace(',','.')||0,hp,(r.producao||[]).filter(function(p){ return +p.producao>0; }).length,
-        (r.clima.manha.status==='Paralisado'&&r.clima.tarde.status==='Paralisado')?'Sim':'Não']);
+    var res=await fetch(cfg.gsUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body,redirect:'follow'});
+    var j=await res.json(); if(!j.ok) throw new Error(j.erro||'erro no script'); return true;
+  }catch(e){
+    if(e&&e.message&&e.message!=='Failed to fetch'&&!/Load failed|NetworkError|JSON|Unexpected/.test(e.message)) throw e;
+    if(!navigator.onLine) throw new Error('sem internet');
+    await fetch(cfg.gsUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body}); return true;
+  }
+}
+async function gsFlush(){
+  if(gsBusy||!cfg.gsUrl) return; var q=gsQueue(); if(!q.length){ gsShow(); return; }
+  if(!navigator.onLine){ gsShow(); return; }
+  gsBusy=true;
+  try{
+    for(var i=0;i<q.length;i+=15){
+      var part=q.slice(i,i+15), dias=[];
+      for(var k=0;k<part.length;k++){ var d=part[k]; var r=normRdo(await Store.getRdo(d),d); dias.push({obra:cfg.obra||'OBRA',data:d,tabelas:dayTables(r)}); }
+      await gsPost({dias:dias});
+      var rest=gsQueue().filter(function(x){ return part.indexOf(x)<0; }); gsSetQueue(rest);
     }
-    var blob=await buildXlsx([
-      {name:'Dias',cols:[{h:'Data',t:'d',w:12},{h:'RDO_N',t:'n',w:8},{h:'Dia_semana',t:'s',w:14},{h:'Efetivo_total',t:'n',w:13},{h:'Equipamentos_total',t:'n',w:18},{h:'Chuva_mm',t:'n',w:10},{h:'Horas_paradas',t:'n',w:14},{h:'Servicos_com_producao',t:'n',w:20},{h:'Dia_paralisado',t:'s',w:14}],rows:T.dias},
-      {name:'Producao',cols:[{h:'Data',t:'d',w:12},{h:'Empresa',t:'s',w:24},{h:'Servico',t:'s',w:32},{h:'Unidade',t:'s',w:10},{h:'Producao',t:'n',w:12}],rows:T.prod},
-      {name:'Efetivo',cols:[{h:'Data',t:'d',w:12},{h:'Empresa',t:'s',w:24},{h:'Funcao',t:'s',w:28},{h:'Quantidade',t:'n',w:12}],rows:T.efet},
-      {name:'Equipamentos',cols:[{h:'Data',t:'d',w:12},{h:'Equipamento',t:'s',w:32},{h:'Quantidade',t:'n',w:12},{h:'Frente_obs',t:'s',w:30}],rows:T.equip},
-      {name:'Clima',cols:[{h:'Data',t:'d',w:12},{h:'Periodo',t:'s',w:10},{h:'Condicao',t:'s',w:12},{h:'Status',t:'s',w:22},{h:'Observacao',t:'s',w:30}],rows:T.clima}
-    ]);
-    var name='BASE RDO - '+(cfg.obra||'OBRA').replace(/[\\/:*?"<>|]/g,'')+'.xlsx';
-    var file=null; try{ file=new File([blob],name,{type:XLSX_MIME}); }catch(e){}
-    if(file&&navigator.canShare&&navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:name}); toast('Base exportada: '+days.length+' dia(s).'); return; }catch(e){ if(e&&e.name==='AbortError'){ toast('Exportação cancelada.'); return; } } }
-    var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(url); },60000);
-    toast('Base exportada: '+days.length+' dia(s).');
-  }catch(e){ console.error(e); toast('Não consegui montar a base. Tente de novo.'); }
-  finally{ btn.disabled=false; btn.textContent='Exportar base (Excel)'; }
+    LS.set('gsultimo',Date.now());
+  }catch(e){ LS.set('gserro',String(e&&e.message||e)); }
+  finally{ gsBusy=false; gsShow(); }
+}
+function gsShow(){
+  var q=gsQueue(), last=LS.get('gsultimo'), err=LS.get('gserro');
+  var t; if(!cfg.gsUrl) t='Cada RDO salvo vai sozinho para a planilha do Google. Configure o endereço na aba Obra.';
+  else if(q.length) t=q.length+' dia(s) aguardando envio'+(navigator.onLine?'…':' (sem internet; envia quando voltar).');
+  else t='Planilha em dia'+(last?' · último envio '+new Date(last).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'')+'.';
+  var el=$('#gsHistStatus'); if(el) el.textContent=t;
+  if(cfg.gsUrl&&!q.length) LS.set('gserro',null);
+}
+async function gsSendAll(){
+  if(!cfg.gsUrl){ toast('Configure primeiro o endereço do Google Sheets na aba Obra.'); showView('obra'); return; }
+  var list=await Store.list(); var days=Object.keys(list).sort(); if(!days.length){ toast('Nenhum RDO salvo ainda.'); return; }
+  gsSetQueue(days); var btn=$('#gsSendAll'); btn.disabled=true; btn.textContent='Enviando '+days.length+' dia(s)…';
+  await gsFlush(); btn.disabled=false; btn.textContent='Enviar todos os dias agora';
+  if(gsQueue().length) toast('Não consegui enviar: '+(LS.get('gserro')||'verifique a internet e o endereço.')); else toast(days.length+' dia(s) enviados para a planilha.');
+}
+async function gsSaveTest(){
+  var url=$('#gsUrl').value.trim(), st=$('#gsStatus'); st.hidden=false; st.className='msg';
+  if(url&&!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url)){ st.className='msg err'; st.textContent='Esse endereço não parece do Apps Script. Ele começa com https://script.google.com/macros/s/ e termina com /exec.'; return; }
+  cfg.gsUrl=url; await Store.saveConfig(cfg);
+  if(!url){ st.textContent='Envio para o Google Sheets desligado.'; gsShow(); return; }
+  st.textContent='Testando a conexão…';
+  try{ var res=await fetch(url,{redirect:'follow'}); var j=await res.json(); if(!j.ok) throw 0;
+    st.textContent='Conectado à planilha "'+j.planilha+'". As abas foram criadas. Os próximos RDOs salvos vão para lá automaticamente.';
+  }catch(e){ st.className='msg err'; st.textContent='Salvei o endereço, mas não consegui confirmar a conexão. Confira se a implantação está como "Qualquer pessoa" e se você está com internet. Você pode tentar "Enviar todos os dias agora" na aba Histórico.'; }
 }
 
 // ---------- history ----------
@@ -813,14 +821,17 @@ $('#newUnid').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.pre
 document.addEventListener('click',function(e){ var d=e.target.closest('[data-cdel]'); if(!d) return; var k=d.dataset.cdel; cfg[k].splice(+d.dataset.ci,1); Store.saveConfig(cfg); renderCad(); });
 
 $('#expBk').addEventListener('click',exportBackup);
-$('#expBase').addEventListener('click',exportBase);
+$('#gsSendAll').addEventListener('click',gsSendAll);
+$('#gsSave').addEventListener('click',gsSaveTest);
+window.addEventListener('online',function(){ gsFlush(); });
 $('#impBk').addEventListener('change',function(e){ importBackup(e.target.files[0]); });
 
 // ---------- navigation ----------
 function showView(v){ ['dia','hist','obra'].forEach(function(x){ $('#view-'+x).hidden=x!==v; $('#tab-'+x).setAttribute('aria-selected',String(x===v)); });
-  $('#bar').hidden=v!=='dia'; $('#daybar').hidden=v!=='dia'; if(v==='hist') renderHist(); if(v==='obra'){ renderCfg(); renderCad(); } window.scrollTo(0,0); }
+  $('#bar').hidden=v!=='dia'; $('#daybar').hidden=v!=='dia'; if(v==='hist') renderHist(); if(v==='obra'){ renderCfg(); renderCad(); $('#gsUrl').value=cfg.gsUrl||''; }
+  if(v==='hist') gsShow(); window.scrollTo(0,0); }
 $$('.tabs button').forEach(function(b){ b.addEventListener('click',function(){ showView(b.dataset.view); }); });
-async function loadDay(date){ if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; await doSave(); } rdo=normRdo(await Store.getRdo(date),date); $('#aiText').value=''; aiMsg(''); renderAll(); setSync(db?'nuvem conectada':'salvando neste aparelho'); }
+async function loadDay(date){ if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; await doSave(); } rdo=normRdo(await Store.getRdo(date),date); $('#aiText').value=''; aiMsg(''); renderAll(); setSync('salvo no celular'); }
 $('#dayInput').addEventListener('change',function(e){ if(e.target.value) loadDay(e.target.value); });
 $('#prevDay').addEventListener('click',function(){ loadDay(addDays(rdo.data,-1)); });
 $('#nextDay').addEventListener('click',function(){ loadDay(addDays(rdo.data,1)); });
@@ -846,6 +857,7 @@ try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(
   var rc=await Store.getConfig(); if(rc) cfg=Object.assign(clone(DEFAULT_CFG),rc);
   rdo=normRdo(await Store.getRdo(rdo.data),rdo.data);
   renderAll(); setSync('salvo no celular');
+  gsFlush();
 })();
 })();
 </script>
