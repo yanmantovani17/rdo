@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = 'fvs-v1';
+var APP_VER = '2026.10.09-1';   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -435,11 +435,29 @@ function goHome(){ flushAll(); cur=null; showView('painel'); }
 window.addEventListener('popstate',function(){ if(view==='ficha'||view==='novo'){ flushAll(); cur=null; showView('painel'); } });
 $('#backBtn').addEventListener('click',function(){ if(view==='novo' && !$('#novo2').hidden && !$('#nLocais').value.trim()){ renderNovo({}); return; } if(history.state&&history.state.fvs){ history.back(); } else goHome(); });
 $$('.tabs button').forEach(function(b){ b.addEventListener('click',function(){ showView(b.dataset.view); }); });
-document.addEventListener('visibilitychange',function(){ if(document.hidden) flushAll(); });
+document.addEventListener('visibilitychange',function(){ if(document.hidden) flushAll(); else checkUpdate(); });
+
+// ---------- atualização automática ----------
+// Toda vez que o app abre ou volta para a tela, confere se há versão nova publicada.
+// Se houver, salva tudo e recarrega sozinho, voltando para a mesma ficha.
+var swReg=null, updating=false;
+async function checkUpdate(){
+  if(updating || (location.protocol!=='https:' && location.hostname!=='localhost') || !navigator.onLine) return;
+  try{
+    if(swReg) swReg.update().catch(function(){});
+    var r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return;
+    var v=(await r.json()).v; if(!v || v===APP_VER) return;
+    try{ if(sessionStorage.getItem('fvs:tried')===v) return; sessionStorage.setItem('fvs:tried', v); }catch(e){}   // evita recarregar em loop
+    updating=true; flushAll();
+    try{ sessionStorage.setItem('fvs:reopen', JSON.stringify({id:cur&&cur.id, view:view})); sessionStorage.setItem('fvs:updated', v); }catch(e){}
+    setSync('atualizando o app…');
+    setTimeout(function(){ location.reload(); },600);
+  }catch(e){}
+}
 window.addEventListener('pagehide',flushAll);
 
 // ---------- boot ----------
-if('serviceWorker' in navigator && location.protocol==='https:'){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
+if('serviceWorker' in navigator && location.protocol==='https:'){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(r){ swReg=r; }).catch(function(){}); }); }
 try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 (async function boot(){
   var c=LS.get('cfg'); if(c) cfg=Object.assign({},DEFAULT_CFG,c);
@@ -447,6 +465,12 @@ try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(
   var maxN=fichas.reduce(function(a,f){ return Math.max(a,f.n||0); },0); if(maxN>(cfg.seq||0)){ cfg.seq=maxN; saveCfg(); }
   setSync('salvo no celular');
   showView('painel');
+  try{ var ro=JSON.parse(sessionStorage.getItem('fvs:reopen')||'null'); sessionStorage.removeItem('fvs:reopen');
+    var upd=sessionStorage.getItem('fvs:updated'); sessionStorage.removeItem('fvs:updated');
+    if(ro){ if(ro.view==='ficha' && ro.id && fichas.some(function(f){ return f.id===ro.id; })) openFicha(ro.id); else if(ro.view==='pend'||ro.view==='obra') showView(ro.view); }
+    if(upd) setTimeout(function(){ toast('App atualizado para a versão nova.'); },400);
+  }catch(e){}
+  setTimeout(checkUpdate,1500);
   if(!c){ setTimeout(function(){ toast('Primeiro acesso: preencha a aba Obra com os nomes dos responsáveis.'); },600); }
 })();
 window.__fvs={get fichas(){return fichas;}, get cur(){return cur;}, cfg:function(){return cfg;}};
