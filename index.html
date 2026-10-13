@@ -281,7 +281,7 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
   <h2 class="sheet-h">Backup</h2>
   <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
   <div class="backup"><button type="button" class="btn" id="expBk">Exportar backup</button><label class="btn">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
-  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 7</p>
+  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 8</p>
 </main>
 
 <div class="bar" id="bar">
@@ -810,7 +810,7 @@ async function ntAtivar(){
     var sub=await reg.pushManager.getSubscription();
     if(!sub){
       var v=await (await fetch(gsUrl()+'?acao=vapid',{redirect:'follow'})).json();
-      if(!v||!v.vapid) throw new Error('A planilha ainda não está com o código novo dos lembretes.');
+      if(!v||!v.vapid){ ntMsg('A planilha ainda está com o código antigo. Troque o código no Apps Script, rode "instalarLembretes", publique a nova versão e toque em "Ativar lembretes" de novo.',true); return; }
       sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToU8(v.vapid)});
     }
     var r=await gsCall({acao:'assinar',assinatura:sub.toJSON(),obra:cfg.obra||''});
@@ -922,7 +922,7 @@ $('#genBtn').addEventListener('click',function(){ if(saveTimer){ clearTimeout(sa
 document.addEventListener('visibilitychange',function(){ if(document.hidden&&saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); } });
 
 // ---------- boot ----------
-var APP_VERSION=7;
+var APP_VERSION=8;
 if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{ r.update(); }catch(e){} }).catch(function(){}); }); }
 async function forceUpdate(){
   var b=$('#updBtn'); if(b){ b.disabled=true; b.textContent='Atualizando…'; }
