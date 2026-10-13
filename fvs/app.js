@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = '2026.10.09-1';   // troque junto com version.json a cada publicação
+var APP_VER = '2026.10.13-1';   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -33,7 +33,7 @@ var DB=(function(){
   };
 })();
 
-var DEFAULT_CFG={obra:'GOLGI RODOANEL NORTE', unidade:'', insp:'', sigla:'', prod:'', qual:'', eng:'', locais:[], seq:0};
+var DEFAULT_CFG={obra:'GOLGI RODOANEL NORTE', unidade:'', insp:'', sigla:'', prod:'', qual:'', eng:'', locais:[], seq:0, gsUrl:''};
 var cfg=Object.assign({},DEFAULT_CFG);
 var fichas=[];           // all records, in memory
 var cur=null;            // open ficha
@@ -48,7 +48,7 @@ function saveCfg(){ LS.set('cfg',cfg); }
 var saveTimers={};
 function touch(f){ f=f||cur; if(!f) return; f.atualizado=Date.now(); setSync('salvando…'); clearTimeout(saveTimers[f.id]);
   saveTimers[f.id]=setTimeout(function(){ delete saveTimers[f.id]; persist(f); },500); }
-function persist(f){ return DB.put(f).then(function(){ setSync('salvo no celular'); }).catch(function(e){ console.error(e); setSync('erro ao salvar'); toast('Não consegui salvar. Libere espaço no celular.'); }); }
+function persist(f){ return DB.put(f).then(function(){ setSync('salvo no celular'); gsMark(f.id); }).catch(function(e){ console.error(e); setSync('erro ao salvar'); toast('Não consegui salvar. Libere espaço no celular.'); }); }
 function flushAll(){ Object.keys(saveTimers).forEach(function(id){ clearTimeout(saveTimers[id]); delete saveTimers[id]; var f=fichas.find(function(x){return x.id===id;}); if(f) persist(f); }); }
 
 // ---------- model ----------
@@ -333,7 +333,7 @@ async function deleteFicha(f){
   if(!confirm('Excluir a FVS Nº'+String(f.n).padStart(3,'0')+' ('+f.titulo+' – '+f.local+')? Isso não pode ser desfeito.')) return;
   var keys=[]; f.fotos.forEach(function(p){ keys.push(p.id); }); f.itens.forEach(function(it){ it.fotos.forEach(function(p){ keys.push(p.id); }); }); ['prod','qual','eng'].forEach(function(k){ if(f.ass[k].sig) keys.push(f.ass[k].sig); });
   clearTimeout(saveTimers[f.id]); delete saveTimers[f.id];
-  await DB.del(f.id); keys.forEach(function(k){ DB.delB(k).catch(function(){}); });
+  await DB.del(f.id); keys.forEach(function(k){ DB.delB(k).catch(function(){}); }); gsRemove(f.id);
   fichas=fichas.filter(function(x){ return x!==f; }); cur=null; goHome(); toast('FVS excluída.');
 }
 
@@ -350,9 +350,89 @@ function renderPend(){
 $('#plist').addEventListener('click',function(e){ var b=e.target.closest('.frow'); if(b) openFicha(b.dataset.id, +b.dataset.i); });
 
 // ---------- config ----------
+// ---------- Google Sheets ----------
+// Cada ficha salva entra numa fila; a fila é enviada ao script da planilha (Apps Script) quando há internet.
+function gsQueue(){ return LS.get('gsfila')||[]; }
+function gsRemQueue(){ return LS.get('gsrem')||[]; }
+var gsTimer=null, gsBusy=false;
+function gsMark(id){ if(!cfg.gsUrl) return; var q=gsQueue(); if(q.indexOf(id)<0){ q.push(id); LS.set('gsfila',q); } clearTimeout(gsTimer); gsTimer=setTimeout(gsFlush,4000); }
+function gsRemove(id){ LS.set('gsfila',gsQueue().filter(function(x){ return x!==id; })); if(!cfg.gsUrl) return; var r=gsRemQueue(); if(r.indexOf(id)<0){ r.push(id); LS.set('gsrem',r); } clearTimeout(gsTimer); gsTimer=setTimeout(gsFlush,1500); }
+function resultadoFinal(it){ if(!it.v1) return 'Não verificado'; if(it.v1.c==='A') return 'Aprovado'; if(it.v1.c==='NA') return 'N/A';
+  if(it.v2&&it.v2.c==='A') return 'Aprovado após reparo'; if(it.v2&&it.v2.c==='NA') return 'N/A'; return 'Reparo pendente'; }
+function gsFicha(f){
+  var s=stats(f), A=0, R=0, N=0; var proc=fCode(f)+' - '+f.titulo;
+  var itens=f.itens.map(function(it,i){ if(it.v1){ if(it.v1.c==='A') A++; else if(it.v1.c==='R') R++; else N++; }
+    var mes=((it.v1&&it.v1.d)||f.inicio||'').slice(0,7);
+    return [f.obra||cfg.obra||'', f.n, proc, f.local, mes, it.sec||'', i+1, it.item||it.oque, it.oque||'',
+      it.v1?it.v1.c:'', it.v1?it.v1.i:'', it.v1?it.v1.d:'', it.v2?it.v2.c:'', it.v2?it.v2.i:'', it.v2?it.v2.d:'', resultadoFinal(it), it.obs||'']; });
+  var insp=[]; f.itens.forEach(function(it){ [it.v1,it.v2].forEach(function(v){ if(v&&v.i&&insp.indexOf(v.i)<0) insp.push(v.i); }); });
+  return {id:f.id, fvs:[f.obra||cfg.obra||'', f.n, f.codigo, proc, f.cat||'', f.local, f.projetos||'', f.inicio||'', f.termino||'',
+    s.t, s.feitos, A, R, N, s.pend, (A+R)? A/(A+R) : '', ST_LBL[s.st], insp.join(', ')||cfg.insp||'', f.atualizado||Date.now()], itens:itens};
+}
+async function gsPost(payload){
+  var body=JSON.stringify(payload);
+  try{
+    var res=await fetch(cfg.gsUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body,redirect:'follow'});
+    var j=await res.json(); if(!j.ok) throw new Error(j.erro||'erro no script'); return true;
+  }catch(e){
+    if(e&&e.message&&!/Failed to fetch|Load failed|NetworkError|JSON|Unexpected/.test(e.message)) throw e;
+    if(!navigator.onLine) throw new Error('sem internet');
+    // o Google às vezes bloqueia a leitura da resposta; envia sem ler a resposta
+    await fetch(cfg.gsUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body}); return true;
+  }
+}
+async function gsFlush(){
+  if(gsBusy||!cfg.gsUrl) return; var q=gsQueue(), rem=gsRemQueue(); if(!q.length&&!rem.length){ gsShow(); return; }
+  if(!navigator.onLine){ gsShow(); return; }
+  gsBusy=true; gsShow();
+  try{
+    if(rem.length){ await gsPost({fichas:[],remover:rem}); LS.set('gsrem',gsRemQueue().filter(function(x){ return rem.indexOf(x)<0; })); }
+    for(var i=0;i<q.length;i+=10){
+      var part=q.slice(i,i+10), lote=[];
+      part.forEach(function(id){ var f=fichas.find(function(x){ return x.id===id; }); if(f) lote.push(gsFicha(f)); });
+      if(lote.length) await gsPost({fichas:lote});
+      LS.set('gsfila',gsQueue().filter(function(x){ return part.indexOf(x)<0; }));
+    }
+    LS.set('gsultimo',Date.now()); LS.set('gserro',null);
+  }catch(e){ LS.set('gserro',String(e&&e.message||e)); }
+  finally{ gsBusy=false; gsShow(); }
+}
+function gsShow(){
+  var el=$('#gsInfo'); if(!el) return; var q=gsQueue().length+gsRemQueue().length, last=LS.get('gsultimo'), err=LS.get('gserro'), t;
+  if(!cfg.gsUrl) t='Envio para o Google Sheets desligado.';
+  else if(gsBusy) t='Enviando para a planilha…';
+  else if(q) t=q+' FVS aguardando envio'+(navigator.onLine?(err?' (último erro: '+err+')':'…'):' (sem internet; envia quando voltar).');
+  else t='Planilha em dia'+(last?' · último envio '+new Date(last).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'')+'.';
+  el.textContent=t; $('#gsSendAll').hidden=!cfg.gsUrl;
+}
+async function gsSendAll(){
+  if(!cfg.gsUrl){ toast('Configure primeiro o endereço do Google Sheets.'); return; }
+  if(!fichas.length){ toast('Ainda não há FVS salvas.'); return; }
+  LS.set('gsfila',fichas.map(function(f){ return f.id; })); var btn=$('#gsSendAll'); btn.disabled=true; btn.textContent='Enviando '+fichas.length+' FVS…';
+  await gsFlush(); btn.disabled=false; btn.textContent='Enviar todas as FVS agora';
+  if(gsQueue().length) toast('Não consegui enviar: '+(LS.get('gserro')||'verifique a internet e o endereço.')); else toast(fichas.length+' FVS enviadas para a planilha.');
+}
+async function gsSaveTest(){
+  var url=$('#gsUrl').value.trim(), st=$('#gsStatus'); st.hidden=false; st.className='msg';
+  if(url&&!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url)){ st.className='msg err'; st.textContent='Esse endereço não parece do Apps Script. Ele começa com https://script.google.com/macros/s/ e termina com /exec.'; return; }
+  var novo=url&&url!==cfg.gsUrl; cfg.gsUrl=url; saveCfg();
+  if(!url){ st.textContent='Envio para o Google Sheets desligado.'; gsShow(); return; }
+  st.textContent='Testando a conexão…';
+  try{ var res=await fetch(url,{redirect:'follow'}); var j=await res.json(); if(!j.ok) throw 0;
+    st.textContent='Conectado à planilha "'+j.planilha+'". As abas FVS, Itens e Indicadores foram criadas.'+(fichas.length?' Enviando as FVS que já estão no celular…':'');
+  }catch(e){ st.className='msg err'; st.textContent='Salvei o endereço, mas não consegui confirmar a conexão. Confira se a implantação está como "Qualquer pessoa" e se você está com internet. Depois toque em "Enviar todas as FVS agora".'; gsShow(); return; }
+  if(novo && fichas.length){ LS.set('gsfila',fichas.map(function(f){ return f.id; })); await gsFlush();
+    st.textContent='Conectado à planilha "'+j.planilha+'". '+(gsQueue().length?'Algumas FVS não foram enviadas; toque em "Enviar todas as FVS agora".':fichas.length+' FVS enviadas. As próximas vão sozinhas.'); }
+  gsShow();
+}
+$('#gsSave').addEventListener('click',gsSaveTest);
+$('#gsSendAll').addEventListener('click',gsSendAll);
+window.addEventListener('online',function(){ gsFlush(); });
+
 function renderCfg(){
   $('#c-obra').value=cfg.obra||''; $('#c-unid').value=cfg.unidade||''; $('#c-insp').value=cfg.insp||''; $('#c-sigla').value=cfg.sigla||'';
   $('#c-prod').value=cfg.prod||''; $('#c-qual').value=cfg.qual||''; $('#c-eng').value=cfg.eng||''; $('#c-locais').value=(cfg.locais||[]).join('\n');
+  $('#gsUrl').value=cfg.gsUrl||''; gsShow();
   $('#verInfo').textContent='Versão '+APP_VER+' · '+MODELOS.length+' modelos de FVS · '+fichas.length+' fichas salvas neste celular';
 }
 $('#saveCfg').addEventListener('click',function(){
@@ -471,6 +551,7 @@ try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(
     if(upd) setTimeout(function(){ toast('App atualizado para a versão nova.'); },400);
   }catch(e){}
   setTimeout(checkUpdate,1500);
+  setTimeout(gsFlush,2500);
   if(!c){ setTimeout(function(){ toast('Primeiro acesso: preencha a aba Obra com os nomes dos responsáveis.'); },600); }
 })();
 window.__fvs={get fichas(){return fichas;}, get cur(){return cur;}, cfg:function(){return cfg;}};

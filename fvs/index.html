@@ -192,6 +192,8 @@ textarea{resize:vertical;min-height:72px}
 .bar .prog b{display:block;font-family:var(--f-mono);color:var(--ink);font-size:1rem}
 .bar .btn{flex:1}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--asphalt);color:var(--asphalt-ink);padding:10px 16px;border-radius:8px;z-index:60;max-width:calc(100% - 32px);font-size:.92rem;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.msg{font-size:.9rem;border-radius:8px;padding:10px 12px;background:var(--ok-soft);color:var(--ink)}
+.msg.err{background:var(--warn-soft)}
 .pendrow .it-h b{font-size:.95rem}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 @media (max-width:380px){ .seg3 button{min-width:50px} .ver .lbl{min-width:0;width:100%} }
@@ -275,6 +277,15 @@ textarea{resize:vertical;min-height:72px}
     <label class="field"><span class="lbl">Responsável Engenharia</span><input type="text" id="c-eng"></label>
     <label class="field"><span class="lbl">Locais frequentes (um por linha)</span><textarea id="c-locais" rows="4" placeholder="Ex.: Eixo 1&#10;Bloco B - 2º pavimento"></textarea></label>
     <button type="button" class="btn dark full" id="saveCfg">Salvar dados da obra</button>
+  </div>
+  <h2 class="sheet-h">Google Sheets</h2>
+  <p class="note">Endereço do script instalado na planilha (termina em <b>/exec</b>). Com ele configurado, cada FVS salva vai sozinha para as abas FVS, Itens e Indicadores, onde a planilha calcula a % de aprovação de cada processo. Sem internet, o app guarda e envia depois.</p>
+  <div class="card pad">
+    <label class="field"><span class="lbl">Endereço do App da Web</span><input type="text" id="gsUrl" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <button type="button" class="btn dark full" id="gsSave">Salvar e testar</button>
+    <div id="gsStatus" class="msg" hidden></div>
+    <p class="note" id="gsInfo"></p>
+    <button type="button" class="btn full" id="gsSendAll">Enviar todas as FVS agora</button>
   </div>
   <h2 class="sheet-h">Relatórios</h2>
   <p class="note">Planilha com todas as FVS (status, datas, reparos) e a lista de pendências, para controle e envio à Qualidade.</p>
