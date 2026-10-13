@@ -26,7 +26,8 @@
  *   Materiais   - catálogo de materiais, unidade e perda aceitável
  */
 
-var MAT_PLANILHA_ID = '1WPcWJEqgLLRL6I76wyO0XKB4qdPJqqbEG7LENq7842E';   // MATRIZ_CAJAMAR_MATERIAIS
+var MAT_PLANILHA_ID = '1WPcWJEqgLLRL6I76wyO0XKB4qdPJqqbEG7LENq7842E';   // MATRIX_CAJAMAR_MATERIAL
+// https://docs.google.com/spreadsheets/d/1WPcWJEqgLLRL6I76wyO0XKB4qdPJqqbEG7LENq7842E/edit
 function planilha_() { try { return SpreadsheetApp.openById(MAT_PLANILHA_ID); } catch (e) { return SpreadsheetApp.getActiveSpreadsheet(); } }
 
 var MAT_ABAS = {

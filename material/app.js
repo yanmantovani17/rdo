@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = 2;   // troque junto com version.json a cada publicação
+var APP_VER = 3;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -734,7 +734,7 @@ function perguntaRascunho(){
 // ---------- obra ----------
 function renderCfg(){
   $('#c-obra').value=cfg.obra||''; $('#gsUrl').value=gsUrl(); gsShow();
-  $('#gsCard').hidden=TESTE; $('#gsNote').textContent= TESTE? 'Modo teste: nada vai para a planilha. Para usar de verdade, toque em Sair (abaixo) e entre com seu usuário da planilha de materiais.' : 'Cada lançamento salvo vai para a planilha de materiais (abas Lancamentos, Entregas, Pecas e Indicadores). O app também baixa de lá o projeto e os lançamentos das outras pessoas. Sem internet, guarda e envia depois.';
+  $('#gsCard').hidden=TESTE; $('#gsAbrir').hidden=TESTE; $('#gsNote').textContent= TESTE? 'Modo teste: nada vai para a planilha. Para usar de verdade, toque em Sair (abaixo) e entre com seu usuário da planilha de materiais.' : 'Cada lançamento salvo vai para a planilha de materiais (abas Lancamentos, Entregas, Pecas e Indicadores). O app também baixa de lá o projeto e os lançamentos das outras pessoas. Sem internet, guarda e envia depois.';
   var s=sessao(); $('#acNome').textContent= s? (s.nome+(s.teste?'':' ('+s.usuario+')')+' · '+s.perfil) : '—';
   $('#acSair').textContent= TESTE? 'Sair do teste' : 'Sair';
   verLine();

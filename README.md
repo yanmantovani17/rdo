@@ -27,3 +27,5 @@ App de celular para controlar a perda de material: a engenharia cadastra o proje
 **Abrir / instalar:** https://yanmantovani17.github.io/rdo/material/
 
 O script `google-sheets/Materiais.gs` vai na planilha de materiais (Extensões → Apps Script) e grava as abas Indicadores, Lancamentos, Entregas, Pecas, Projeto, Materiais e Usuarios (com a coluna Perfil: Engenharia ou Campo).
+
+**Planilha de materiais:** https://docs.google.com/spreadsheets/d/1WPcWJEqgLLRL6I76wyO0XKB4qdPJqqbEG7LENq7842E/edit
