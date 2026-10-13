@@ -1,5 +1,5 @@
 // Mantém o app funcionando sem internet. Ao publicar uma nova versão, troque VERSAO.
-const VERSAO = 'rdo-v5';
+const VERSAO = 'rdo-v6';
 const ARQUIVOS = ['./', 'index.html', 'rdo-gen.js', 'template.js', 'jszip.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSAO).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

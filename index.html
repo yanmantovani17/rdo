@@ -150,6 +150,13 @@ textarea{resize:vertical;min-height:88px}
 
 /* history & config */
 .wrap>#sections{display:flex;flex-direction:column;gap:12px}
+.st{width:14px;height:14px;border-radius:50%;flex:none;align-self:flex-start;margin-top:5px}
+.st.ok{background:var(--ok)}
+.st.pend{background:var(--signal)}
+.st-miss{font-size:.8rem;margin-top:2px;color:var(--warn)}
+.st-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.82rem;color:var(--muted)}
+.st-legend span{display:inline-flex;align-items:center;gap:6px}
+.st-legend .st{margin:0;width:11px;height:11px}
 .hist{display:flex;flex-direction:column;gap:8px}
 .hrow{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .hrow .d{font-family:var(--f-mono);font-weight:600}
@@ -267,7 +274,7 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
   <h2 class="sheet-h">Backup</h2>
   <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
   <div class="backup"><button type="button" class="btn" id="expBk">Exportar backup</button><label class="btn">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
-  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 5</p>
+  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 6</p>
 </main>
 
 <div class="bar" id="bar">
@@ -373,15 +380,15 @@ function setSync(t){ $('#sync').textContent=t; }
 var toastTimer; function toast(t){ var el=$('#toast'); el.textContent=t; el.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(function(){ el.hidden=true; },3200); }
 
 // ---------- sections ----------
-function done(key){
-  var r=rdo;
+function done(key, rr){
+  var r=rr||rdo;
   switch(key){
     case 'clima': return PERIODS.every(function(p){ return r.clima[p[0]].cond && r.clima[p[0]].status; });
     case 'efetivo': return totalEfetivo(r)>0;
     case 'visit': return (r.visitantes||[]).some(function(v){ return v.empresa; });
     case 'equip': return Object.keys(r.equip||{}).some(function(k){ return (+r.equip[k].qtd||0)>0; });
     case 'ativ': return (r.atividades||[]).some(function(a){ return a.desc; });
-    case 'prod': return (r.producao||[]).some(function(p){ return +p.producao>0; });
+    case 'prod': return (r.producao||[]).some(function(p){ return +p.producao>0; }) && !(r.producao||[]).some(function(p){ return +p.producao>0 && !(p.servico&&p.unidade&&p.empresa); });
     case 'ocorr': return !!(r.ocorrencias||r.comLibercon);
     case 'fotos': return (r.fotos||[]).length>0;
   }
@@ -714,7 +721,7 @@ function dayTables(r){
   var hp=r.paralisacao.filter(Boolean).length, eqTot=0;
   Object.keys(r.equip||{}).forEach(function(k){ var q=+(r.equip[k].qtd)||0; eqTot+=q; if(q) T.Equipamentos.push([k,q,r.equip[k].obs||'']); });
   Object.keys(r.efetivo||{}).forEach(function(e){ var q=r.efetivo[e]||{}; Object.keys(q).forEach(function(f){ var n=+q[f]||0; if(n) T.Efetivo.push([e,f.replace(/\s+/g,' '),n]); }); });
-  (r.producao||[]).forEach(function(p){ if(p.servico&&+p.producao>0) T.Producao.push([p.empresa||'',p.servico,p.unidade||'',+p.producao]); });
+  (r.producao||[]).forEach(function(p){ if(+p.producao>0) T.Producao.push([p.empresa||'',p.servico||'(sem serviço)',p.unidade||'',+p.producao]); });
   PERIODS.forEach(function(pp){ var c=r.clima[pp[0]]||{}; if(c.cond||c.status||c.obs) T.Clima.push([pp[1],c.cond||'',c.status||'',c.obs||'']); });
   T.Dias.push([rdoNumber(r.data)||'',G.weekday(r.data),totalEfetivo(r),eqTot,+String(r.mm).replace(',','.')||0,hp,T.Producao.length,
     (r.clima.manha.status==='Paralisado'&&r.clima.tarde.status==='Paralisado')?'Sim':'Não', r.updatedAt||Date.now()]);
@@ -755,7 +762,7 @@ async function gsFlush(){
     }
     LS.set('gsultimo',Date.now());
   }catch(e){ LS.set('gserro',String(e&&e.message||e)); }
-  finally{ gsBusy=false; gsShow(); }
+  finally{ gsBusy=false; gsShow(); if(!$('#view-hist').hidden) renderHist(); }
 }
 function gsShow(){
   var q=gsQueue(), last=LS.get('gsultimo'), err=LS.get('gserro');
@@ -785,8 +792,16 @@ async function renderHist(){
   var host=$('#histList'); host.innerHTML='<p class="note">Carregando…</p>';
   var list=await Store.list(); var days=Object.keys(list).sort().reverse();
   if(!days.length){ host.innerHTML='<p class="note">Nenhum RDO salvo ainda. Preencha o dia na aba "Dia" e ele aparece aqui.</p>'; return; }
-  host.innerHTML=days.map(function(d){ var s=list[d]||{}; var dn=G.weekday(d);
-    return '<div class="hrow"><div class="grow"><div class="d">'+br(d)+' · Nº '+(rdoNumber(d)||'—')+'</div><div class="s">'+dn+' · '+(s.efetivo||0)+' pessoas · '+(s.atividades||0)+' atividades'+(s.producao?' · '+s.producao+' produção':'')+(s.clima?' · '+h(s.clima):'')+'</div></div>'+
+  var NOMES={clima:'clima',efetivo:'mão de obra',equip:'equipamentos',ativ:'atividades',prod:'produção',ocorr:'ocorrências',fotos:'fotos'}, sent=LS.get('gsenviados')||{}, fila=gsQueue();
+  var info={};
+  for(var i=0;i<days.length;i++){ var dd=days[i]; var rr=normRdo(await Store.getRdo(dd),dd);
+    var falta=SECTIONS.filter(function(x){ return x[0]!=='visit' && !done(x[0],rr); }).map(function(x){ return NOMES[x[0]]; });
+    var enviado=!!(sent[dd] && sent[dd]>=(rr.updatedAt||1)) && fila.indexOf(dd)<0;
+    info[dd]={falta:falta,enviado:enviado,ok:!falta.length&&enviado}; }
+  var nOk=days.filter(function(d){ return info[d].ok; }).length;
+  host.innerHTML='<div class="st-legend"><span><i class="st ok"></i>Concluído e enviado ('+nOk+')</span><span><i class="st pend"></i>Em andamento ('+(days.length-nOk)+')</span></div>'+days.map(function(d){ var s=list[d]||{}; var dn=G.weekday(d); var it=info[d];
+    var miss=[]; if(it.falta.length) miss.push('Falta: '+it.falta.join(', ')); if(!it.enviado) miss.push('aguardando envio para a planilha');
+    return '<div class="hrow"><i class="st '+(it.ok?'ok':'pend')+'" title="'+(it.ok?'Concluído':'Em andamento')+'" aria-label="'+(it.ok?'Concluído':'Em andamento')+'"></i><div class="grow"><div class="d">'+br(d)+' · Nº '+(rdoNumber(d)||'—')+'</div><div class="s">'+dn+' · '+(s.efetivo||0)+' pessoas · '+(s.atividades||0)+' atividades'+(s.producao?' · '+s.producao+' produção':'')+(s.clima?' · '+h(s.clima):'')+'</div>'+(miss.length?'<div class="st-miss">'+h(miss.join(' · '))+'</div>':'<div class="st-miss" style="color:var(--ok)">Completo e na planilha</div>')+'</div>'+
       '<button type="button" class="btn" data-open="'+d+'">Abrir</button><button type="button" class="btn dark" data-gen="'+d+'" aria-label="Gerar Excel de '+br(d)+'">Excel</button></div>';
   }).join('');
 }
@@ -854,7 +869,7 @@ $('#genBtn').addEventListener('click',function(){ if(saveTimer){ clearTimeout(sa
 document.addEventListener('visibilitychange',function(){ if(document.hidden&&saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); } });
 
 // ---------- boot ----------
-var APP_VERSION=5;
+var APP_VERSION=6;
 if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{ r.update(); }catch(e){} }).catch(function(){}); }); }
 async function forceUpdate(){
   var b=$('#updBtn'); if(b){ b.disabled=true; b.textContent='Atualizando…'; }
