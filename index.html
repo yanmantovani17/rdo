@@ -264,6 +264,13 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
     <div class="cad-list" id="cadUnid"></div>
     <div class="row"><input type="text" id="newUnid" class="grow" placeholder="Ex.: m³"><button type="button" class="btn dark" id="addUnid">Adicionar</button></div>
   </div>
+  <h2 class="sheet-h">Lembretes</h2>
+  <p class="note">Uma notificação por volta das 10h e das 19h lembrando do RDO, com mensagens para animar o dia. Se o RDO de hoje já estiver completo, a das 19h vem com parabéns.</p>
+  <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+    <button type="button" class="btn pri" id="ntAtivar">Ativar lembretes</button>
+    <button type="button" class="btn" id="ntTestar" hidden>Mandar uma notificação de teste</button>
+    <div id="ntStatus" class="msg" hidden></div>
+  </div>
   <h2 class="sheet-h">Google Sheets</h2>
   <p class="note">Já vem ligado à planilha MATRIX_CAJAMAR _PRODUTIVIDADE. Só troque o endereço se mudar de planilha. Cada RDO salvo é enviado para as abas Dias, Producao, Efetivo, Equipamentos e Clima. Sem internet, o app guarda e envia depois.</p>
   <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
@@ -274,7 +281,7 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
   <h2 class="sheet-h">Backup</h2>
   <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
   <div class="backup"><button type="button" class="btn" id="expBk">Exportar backup</button><label class="btn">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
-  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 6</p>
+  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 7</p>
 </main>
 
 <div class="bar" id="bar">
@@ -375,7 +382,7 @@ function rdoNumber(date){ var a=G.serial(date), b=G.serial(cfg.inicio); return (
 
 var saveTimer=null;
 function touch(){ rdo.updatedAt=Date.now(); setSync('salvando…'); clearTimeout(saveTimer); saveTimer=setTimeout(doSave,700); updateProgress(); }
-async function doSave(){ try{ await Store.saveRdo(clone(rdo)); setSync('salvo no celular'); }catch(e){ setSync('salvo no celular'); } gsMark(rdo.data); }
+async function doSave(){ ntStatusHoje(); try{ await Store.saveRdo(clone(rdo)); setSync('salvo no celular'); }catch(e){ setSync('salvo no celular'); } gsMark(rdo.data); }
 function setSync(t){ $('#sync').textContent=t; }
 var toastTimer; function toast(t){ var el=$('#toast'); el.textContent=t; el.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(function(){ el.hidden=true; },3200); }
 
@@ -787,6 +794,52 @@ async function gsSaveTest(){
   }catch(e){ st.className='msg err'; st.textContent='Salvei o endereço, mas não consegui confirmar a conexão. Confira se a implantação está como "Qualquer pessoa" e se você está com internet. Você pode tentar "Enviar todos os dias agora" na aba Histórico.'; }
 }
 
+// ---------- Lembretes (Web Push) ----------
+function ntMsg(t,err){ var m=$('#ntStatus'); m.hidden=!t; m.className='msg'+(err?' err':''); m.textContent=t||''; }
+function b64uToU8(s){ var p='='.repeat((4-s.length%4)%4), b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/')), u=new Uint8Array(b.length); for(var i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; }
+function ntSuportado(){ return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window); }
+async function gsCall(payload){ var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'}); return res.json(); }
+async function ntAtivar(){
+  var btn=$('#ntAtivar');
+  if(!ntSuportado()){ ntMsg('Para receber lembretes, abra o RDO pelo ícone da tela inicial (não pelo Safari). No iPhone, precisa do iOS 16.4 ou mais novo.',true); return; }
+  btn.disabled=true; btn.textContent='Ativando…';
+  try{
+    var perm=await Notification.requestPermission();
+    if(perm!=='granted'){ ntMsg('As notificações estão bloqueadas. Ative em Ajustes do iPhone → Notificações → RDO e tente de novo.',true); return; }
+    var reg=await navigator.serviceWorker.ready;
+    var sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      var v=await (await fetch(gsUrl()+'?acao=vapid',{redirect:'follow'})).json();
+      if(!v||!v.vapid) throw new Error('A planilha ainda não está com o código novo dos lembretes.');
+      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToU8(v.vapid)});
+    }
+    var r=await gsCall({acao:'assinar',assinatura:sub.toJSON(),obra:cfg.obra||''});
+    if(!r||!r.ok) throw new Error((r&&r.erro)||'A planilha não aceitou o cadastro.');
+    LS.set('lembretes',1); ntMsg('Lembretes ativados neste celular. Eles chegam por volta das 10h e das 19h.'); ntRender();
+  }catch(e){ ntMsg('Não consegui ativar: '+(e&&e.message||e)+' Confira a internet e tente de novo.',true); }
+  finally{ btn.disabled=false; ntRender(); }
+}
+async function ntTestar(){
+  var b=$('#ntTestar'); b.disabled=true; b.textContent='Enviando…';
+  try{ var r=await gsCall({acao:'testar'}); ntMsg(r&&r.enviados? 'Notificação de teste enviada. Ela chega em alguns segundos (bloqueie a tela para ver).' : 'A planilha não encontrou celulares cadastrados. Toque em "Ativar lembretes" de novo.', !(r&&r.enviados)); }
+  catch(e){ ntMsg('Não consegui pedir o teste. Confira a internet.',true); }
+  b.disabled=false; b.textContent='Mandar uma notificação de teste';
+}
+async function ntRender(){
+  var on=false; try{ if(ntSuportado()&&Notification.permission==='granted'){ var reg=await navigator.serviceWorker.getRegistration(); on=!!(reg&&await reg.pushManager.getSubscription()); } }catch(e){}
+  $('#ntAtivar').textContent= on? 'Lembretes ativos ✓ (toque para recadastrar)' : 'Ativar lembretes';
+  $('#ntTestar').hidden=!on;
+}
+// diz ao service worker se o RDO de hoje já está completo (para a mensagem das 19h)
+function ntStatusHoje(){
+  try{ if(!window.caches||rdo.data!==todayISO()) return;
+    var completo=SECTIONS.filter(function(x){ return x[0]!=='visit'; }).every(function(x){ return done(x[0]); });
+    caches.open('status-rdo').then(function(c){ c.put('status',new Response(JSON.stringify({hoje:rdo.data,completo:completo}),{headers:{'Content-Type':'application/json'}})); });
+  }catch(e){}
+}
+$('#ntAtivar').addEventListener('click',ntAtivar);
+$('#ntTestar').addEventListener('click',ntTestar);
+
 // ---------- history ----------
 async function renderHist(){
   var host=$('#histList'); host.innerHTML='<p class="note">Carregando…</p>';
@@ -854,7 +907,7 @@ $('#impBk').addEventListener('change',function(e){ importBackup(e.target.files[0
 
 // ---------- navigation ----------
 function showView(v){ ['dia','hist','obra'].forEach(function(x){ $('#view-'+x).hidden=x!==v; $('#tab-'+x).setAttribute('aria-selected',String(x===v)); });
-  $('#bar').hidden=v!=='dia'; $('#daybar').hidden=v!=='dia'; if(v==='hist') renderHist(); if(v==='obra'){ renderCfg(); renderCad(); $('#gsUrl').value=gsUrl(); }
+  $('#bar').hidden=v!=='dia'; $('#daybar').hidden=v!=='dia'; if(v==='hist') renderHist(); if(v==='obra'){ renderCfg(); renderCad(); $('#gsUrl').value=gsUrl(); ntRender(); }
   if(v==='hist') gsShow(); window.scrollTo(0,0); }
 $$('.tabs button').forEach(function(b){ b.addEventListener('click',function(){ showView(b.dataset.view); }); });
 async function loadDay(date){ if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; await doSave(); } rdo=normRdo(await Store.getRdo(date),date); $('#aiText').value=''; aiMsg(''); renderAll(); setSync('salvo no celular'); }
@@ -869,7 +922,7 @@ $('#genBtn').addEventListener('click',function(){ if(saveTimer){ clearTimeout(sa
 document.addEventListener('visibilitychange',function(){ if(document.hidden&&saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); } });
 
 // ---------- boot ----------
-var APP_VERSION=6;
+var APP_VERSION=7;
 if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{ r.update(); }catch(e){} }).catch(function(){}); }); }
 async function forceUpdate(){
   var b=$('#updBtn'); if(b){ b.disabled=true; b.textContent='Atualizando…'; }
