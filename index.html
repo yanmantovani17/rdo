@@ -223,7 +223,7 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
   <h2 class="sheet-h">RDOs salvos</h2>
   <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
     <strong style="font-family:var(--f-display);letter-spacing:.05em;text-transform:uppercase">Google Sheets · Power BI</strong>
-    <p class="note" style="margin:0" id="gsHistStatus">Cada RDO salvo vai sozinho para a planilha do Google. Configure o endereço na aba Obra.</p>
+    <p class="note" style="margin:0" id="gsHistStatus">Cada RDO salvo vai sozinho para a planilha MATRIX_CAJAMAR _PRODUTIVIDADE.</p>
     <button type="button" class="btn pri" id="gsSendAll">Enviar todos os dias agora</button>
   </div>
   <div class="hist" id="histList"></div>
@@ -258,7 +258,7 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
     <div class="row"><input type="text" id="newUnid" class="grow" placeholder="Ex.: m³"><button type="button" class="btn dark" id="addUnid">Adicionar</button></div>
   </div>
   <h2 class="sheet-h">Google Sheets</h2>
-  <p class="note">Endereço do script instalado na planilha (termina em <b>/exec</b>). Com ele configurado, cada RDO salvo é enviado para as abas Dias, Producao, Efetivo, Equipamentos e Clima. Sem internet, o app guarda e envia depois.</p>
+  <p class="note">Já vem ligado à planilha MATRIX_CAJAMAR _PRODUTIVIDADE. Só troque o endereço se mudar de planilha. Cada RDO salvo é enviado para as abas Dias, Producao, Efetivo, Equipamentos e Clima. Sem internet, o app guarda e envia depois.</p>
   <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
     <label class="field"><span class="lbl">Endereço do App da Web</span><input type="text" id="gsUrl" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></label>
     <div class="row"><button type="button" class="btn dark grow" id="gsSave">Salvar e testar</button></div>
@@ -267,7 +267,7 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
   <h2 class="sheet-h">Backup</h2>
   <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
   <div class="backup"><button type="button" class="btn" id="expBk">Exportar backup</button><label class="btn">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
-  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 4</p>
+  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 5</p>
 </main>
 
 <div class="bar" id="bar">
@@ -720,30 +720,37 @@ function dayTables(r){
     (r.clima.manha.status==='Paralisado'&&r.clima.tarde.status==='Paralisado')?'Sim':'Não', r.updatedAt||Date.now()]);
   return T;
 }
+var GS_DEFAULT='https://script.google.com/macros/s/AKfycbwNjEGvhJYB1FAmDcQvhpafMJMt_M6qzU1W_Ef--FL_E4yFiuTMYKWJuvANdEZsxG_qzg/exec';
+function gsUrl(){ return (cfg.gsUrl&&/\/exec/.test(cfg.gsUrl))? cfg.gsUrl : GS_DEFAULT; }
 function gsQueue(){ return LS.get('gsfila')||[]; }
 function gsSetQueue(q){ LS.set('gsfila',q); }
-function gsMark(date){ if(!cfg.gsUrl) return; var q=gsQueue(); if(q.indexOf(date)<0){ q.push(date); gsSetQueue(q); } clearTimeout(gsTimer); gsTimer=setTimeout(gsFlush,4000); }
+function gsMark(date){ var q=gsQueue(); if(q.indexOf(date)<0){ q.push(date); gsSetQueue(q); } clearTimeout(gsTimer); gsTimer=setTimeout(gsFlush,4000); }
 var gsTimer=null, gsBusy=false;
 async function gsPost(payload){
   var body=JSON.stringify(payload);
   try{
-    var res=await fetch(cfg.gsUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body,redirect:'follow'});
+    var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body,redirect:'follow'});
     var j=await res.json(); if(!j.ok) throw new Error(j.erro||'erro no script'); return true;
   }catch(e){
     if(e&&e.message&&e.message!=='Failed to fetch'&&!/Load failed|NetworkError|JSON|Unexpected/.test(e.message)) throw e;
     if(!navigator.onLine) throw new Error('sem internet');
-    await fetch(cfg.gsUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body}); return true;
+    await fetch(gsUrl(),{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body}); return true;
   }
 }
+// queue every saved day that the sheet doesn't have yet (new, changed or restored from backup)
+async function gsQueuePending(){ try{ var list=await Store.list(), sent=LS.get('gsenviados')||{}, q=gsQueue();
+  Object.keys(list).forEach(function(d){ var u=(list[d]&&list[d].updatedAt)||1; if(!(sent[d]>=u) && q.indexOf(d)<0) q.push(d); }); gsSetQueue(q); }catch(e){} }
 async function gsFlush(){
-  if(gsBusy||!cfg.gsUrl) return; var q=gsQueue(); if(!q.length){ gsShow(); return; }
+  if(gsBusy) return; var q=gsQueue(); if(!q.length){ gsShow(); return; }
   if(!navigator.onLine){ gsShow(); return; }
   gsBusy=true;
   try{
     for(var i=0;i<q.length;i+=15){
       var part=q.slice(i,i+15), dias=[];
-      for(var k=0;k<part.length;k++){ var d=part[k]; var r=normRdo(await Store.getRdo(d),d); dias.push({obra:cfg.obra||'OBRA',data:d,tabelas:dayTables(r)}); }
+      var stamp={};
+      for(var k=0;k<part.length;k++){ var d=part[k]; var r=normRdo(await Store.getRdo(d),d); stamp[d]=r.updatedAt||1; dias.push({obra:cfg.obra||'OBRA',data:d,tabelas:dayTables(r)}); }
       await gsPost({dias:dias});
+      var sent=LS.get('gsenviados')||{}; Object.keys(stamp).forEach(function(d){ sent[d]=stamp[d]; }); LS.set('gsenviados',sent);
       var rest=gsQueue().filter(function(x){ return part.indexOf(x)<0; }); gsSetQueue(rest);
     }
     LS.set('gsultimo',Date.now());
@@ -752,14 +759,12 @@ async function gsFlush(){
 }
 function gsShow(){
   var q=gsQueue(), last=LS.get('gsultimo'), err=LS.get('gserro');
-  var t; if(!cfg.gsUrl) t='Cada RDO salvo vai sozinho para a planilha do Google. Configure o endereço na aba Obra.';
-  else if(q.length) t=q.length+' dia(s) aguardando envio'+(navigator.onLine?'…':' (sem internet; envia quando voltar).');
+  var t; if(q.length) t=q.length+' dia(s) aguardando envio'+(navigator.onLine?'…':' (sem internet; envia quando voltar).');
   else t='Planilha em dia'+(last?' · último envio '+new Date(last).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'')+'.';
   var el=$('#gsHistStatus'); if(el) el.textContent=t;
-  if(cfg.gsUrl&&!q.length) LS.set('gserro',null);
+  if(!q.length) LS.set('gserro',null);
 }
 async function gsSendAll(){
-  if(!cfg.gsUrl){ toast('Configure primeiro o endereço do Google Sheets na aba Obra.'); showView('obra'); return; }
   var list=await Store.list(); var days=Object.keys(list).sort(); if(!days.length){ toast('Nenhum RDO salvo ainda.'); return; }
   gsSetQueue(days); var btn=$('#gsSendAll'); btn.disabled=true; btn.textContent='Enviando '+days.length+' dia(s)…';
   await gsFlush(); btn.disabled=false; btn.textContent='Enviar todos os dias agora';
@@ -768,8 +773,7 @@ async function gsSendAll(){
 async function gsSaveTest(){
   var url=$('#gsUrl').value.trim(), st=$('#gsStatus'); st.hidden=false; st.className='msg';
   if(url&&!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url)){ st.className='msg err'; st.textContent='Esse endereço não parece do Apps Script. Ele começa com https://script.google.com/macros/s/ e termina com /exec.'; return; }
-  cfg.gsUrl=url; await Store.saveConfig(cfg);
-  if(!url){ st.textContent='Envio para o Google Sheets desligado.'; gsShow(); return; }
+  cfg.gsUrl=url||GS_DEFAULT; await Store.saveConfig(cfg); $('#gsUrl').value=gsUrl(); url=gsUrl();
   st.textContent='Testando a conexão…';
   try{ var res=await fetch(url,{redirect:'follow'}); var j=await res.json(); if(!j.ok) throw 0;
     st.textContent='Conectado à planilha "'+j.planilha+'". As abas foram criadas. Os próximos RDOs salvos vão para lá automaticamente.';
@@ -829,11 +833,13 @@ $('#expBk').addEventListener('click',exportBackup);
 $('#gsSendAll').addEventListener('click',gsSendAll);
 $('#gsSave').addEventListener('click',gsSaveTest);
 window.addEventListener('online',function(){ gsFlush(); });
+setInterval(function(){ gsQueuePending().then(function(){ if(gsQueue().length) gsFlush(); }); },60000);
+document.addEventListener('visibilitychange',function(){ if(!document.hidden) gsFlush(); });
 $('#impBk').addEventListener('change',function(e){ importBackup(e.target.files[0]); });
 
 // ---------- navigation ----------
 function showView(v){ ['dia','hist','obra'].forEach(function(x){ $('#view-'+x).hidden=x!==v; $('#tab-'+x).setAttribute('aria-selected',String(x===v)); });
-  $('#bar').hidden=v!=='dia'; $('#daybar').hidden=v!=='dia'; if(v==='hist') renderHist(); if(v==='obra'){ renderCfg(); renderCad(); $('#gsUrl').value=cfg.gsUrl||''; }
+  $('#bar').hidden=v!=='dia'; $('#daybar').hidden=v!=='dia'; if(v==='hist') renderHist(); if(v==='obra'){ renderCfg(); renderCad(); $('#gsUrl').value=gsUrl(); }
   if(v==='hist') gsShow(); window.scrollTo(0,0); }
 $$('.tabs button').forEach(function(b){ b.addEventListener('click',function(){ showView(b.dataset.view); }); });
 async function loadDay(date){ if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; await doSave(); } rdo=normRdo(await Store.getRdo(date),date); $('#aiText').value=''; aiMsg(''); renderAll(); setSync('salvo no celular'); }
@@ -848,7 +854,7 @@ $('#genBtn').addEventListener('click',function(){ if(saveTimer){ clearTimeout(sa
 document.addEventListener('visibilitychange',function(){ if(document.hidden&&saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); } });
 
 // ---------- boot ----------
-var APP_VERSION=4;
+var APP_VERSION=5;
 if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{ r.update(); }catch(e){} }).catch(function(){}); }); }
 async function forceUpdate(){
   var b=$('#updBtn'); if(b){ b.disabled=true; b.textContent='Atualizando…'; }
@@ -878,6 +884,7 @@ try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(
   var rc=await Store.getConfig(); if(rc) cfg=Object.assign(clone(DEFAULT_CFG),rc);
   rdo=normRdo(await Store.getRdo(rdo.data),rdo.data);
   renderAll(); setSync('salvo no celular');
+  await gsQueuePending();
   gsFlush();
 })();
 })();
