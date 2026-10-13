@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = 3;   // troque junto com version.json a cada publicação
+var APP_VER = 4;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -422,6 +422,8 @@ function renderProj(){
   $('#projRO').hidden=eng();
   var mats=lista(MATS).sort(function(a,b){ return (a.ativo===false)-(b.ativo===false) || cmp(a.nome,b.nome); });
   $('#projSeed').hidden=!(!mats.length && eng());
+  var temEx=lista(MATS).some(function(m){ return m.exemplo; });
+  $('#projEx').hidden=!eng(); $('#exBtn').textContent= temEx? 'Apagar o exemplo' : 'Carregar exemplo'; $('#exBtn').className= temEx? 'btn danger' : 'btn pri';
   $('#plist').innerHTML=mats.length? mats.map(function(m){ var its=itensDe(m.id), tot=its.reduce(function(s,it){ return s+num(it.qu)*num(it.n); },0);
     return '<button type="button" class="it-card" data-m="'+m.id+'"'+(m.ativo===false?' style="opacity:.6"':'')+'><span class="code">'+h(m.un)+'</span><span class="grow"><span class="tt">'+h(m.nome)+(m.ativo===false?' (inativo)':'')+'</span>'+
       '<span class="meta">'+its.length+' ite'+(its.length===1?'m':'ns')+' de projeto · perda aceitável '+fN(num(m.meta),1)+'%'+(m.cat?' · '+h(m.cat):'')+'</span></span><span class="q">'+fV(tot)+'<br><span class="meta">'+h(m.un)+'</span></span></button>'; }).join('')
@@ -543,7 +545,25 @@ $('#psOk').addEventListener('click',async function(){
   $('#pasteOv').hidden=true; b.disabled=false; toast(n+' itens importados.'); rerender();
 });
 
-// carga da planilha de perda de concreto
+// carga da planilha de perda de concreto / exemplo
+$('#exBtn').addEventListener('click',async function(){
+  var b=this, ex=lista(MATS).concat(lista(ITENS),lista(LANCS)).filter(function(r){ return r.exemplo; });
+  if(ex.length){ confirmar('Apagar o exemplo?','Tira os '+ex.filter(function(r){ return r.k==='lanc'; }).length+' lançamentos, os itens e os materiais marcados como EXEMPLO, aqui e na planilha. O resto não muda.','Apagar exemplo',async function(){
+      var ids=ex.map(function(r){ return r.id; }); ex.forEach(function(r){ delete mapa(r.k)[r.id]; }); await DB.delMany(ids);
+      if(!TESTE){ LS.set('fila',fila().filter(function(x){ return ids.indexOf(x)<0; })); var rm=filaRemList(); ex.forEach(function(r){ rm.push({id:r.id,k:r.k}); }); LS.set('rem',rm); agendar(800); }
+      toast('Exemplo apagado.'); renderProj(); },true); return; }
+  b.disabled=true; b.textContent='Carregando…';
+  try{ await carregarPacote('exemplo.js','MAT_EXEMPLO'); toast('Exemplo carregado: veja o Painel. Os 3 materiais começam com "EXEMPLO ·".',5000); pilha=[]; showView('painel'); }
+  catch(e){ console.error(e); toast('Não consegui carregar. Abra o app com internet e tente de novo.'); }
+  finally{ b.disabled=false; }
+});
+async function carregarPacote(arq, nome){
+  if(!window[nome]) await loadScript(arq); var C=window[nome], agora=Date.now(), s=sessao(), todos=[];
+  ['materiais','itens','lancamentos'].forEach(function(k){ (C[k]||[]).forEach(function(r){ r=clone(r); r.atualizado=agora; r.criado=r.criado||agora; if(r.k==='lanc'){ r.por=eu(); r.porNome=r.porNome||s.nome; } todos.push(r); }); });
+  await DB.putMany(todos); todos.forEach(function(r){ mapa(r.k)[r.id]=r; });
+  if(!TESTE){ var q=fila(); todos.forEach(function(r){ if(q.indexOf(r.id)<0) q.push(r.id); }); LS.set('fila',q); agendar(1500); }
+  return C;
+}
 $('#seedBtn').addEventListener('click',async function(){
   var b=this; b.disabled=true; b.textContent='Carregando…';
   try{ if(!window.MAT_CARGA) await loadScript('carga.js'); var C=window.MAT_CARGA, agora=Date.now(), s=sessao(), todos=[];

@@ -434,6 +434,11 @@ select{appearance:auto}
   <div class="ro-note" id="projRO" hidden>Seu perfil é <b>Campo</b>: você consulta o projeto, mas só a engenharia altera. Para lançar consumo, use o botão de baixo.</div>
   <p class="note">Cada material tem a sua unidade (m³, kg, m², un, saco…). Dentro dele, cadastre os itens do projeto: código da peça, nº de peças e quanto cada uma leva.</p>
   <div class="list" id="plist"></div>
+  <div id="projEx" hidden class="card pad">
+    <b>Exemplo para entender o app</b>
+    <p class="note" id="exTxt">Carrega 3 materiais de exemplo com unidades diferentes: <b>concreto armado</b> (m³, com perda de bomba de 3% em cada concretagem), <b>concreto magro</b> (m³, calculado por C × L × H) e <b>CBUQ</b> (t, com tickets de balança). São 12 lançamentos entre 30/09 e 10/10. Tudo vai para a planilha marcado como EXEMPLO e sai com um toque.</p>
+    <button type="button" class="btn pri" id="exBtn">Carregar exemplo</button>
+  </div>
   <div id="projSeed" hidden class="card pad">
     <b>Começar com a sua planilha de concreto?</b>
     <p class="note">Carrega as sapatas do Galpão A e B (abas GA e GB), os 44 dias de concretagem de 25/03 a 19/06 com as NFs, e o concreto magro. Dá para editar ou apagar tudo depois.</p>
