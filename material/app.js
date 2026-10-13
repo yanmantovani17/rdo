@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = 1;   // troque junto com version.json a cada publicação
+var APP_VER = 2;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -53,7 +53,10 @@ function mapa(k){ return k==='mat'?MATS:(k==='item'?ITENS:LANCS); }
 function lista(o){ return Object.keys(o).map(function(k){ return o[k]; }); }
 function saveCfg(){ LS.set('cfg',cfg); setTitle(); }
 function setTitle(){ document.title=(cfg.obra||'').trim()? 'Material – '+cfg.obra : 'Material'; }
-var GS_DEFAULT='';   // endereço /exec do script da planilha MATRIZ_CAJAMAR_MATERIAIS (preenchido na publicação)
+// endereço /exec do script da planilha MATRIX_CAJAMAR_MATERIAL (implantação de 13/10/2026)
+var GS_CANDIDATOS=['https://script.google.com/macros/s/AKfycbyiYBG9nMxrb1EazCVDyFVB6EKigIsJGyNDUMGU7gtfTJffrR9EbUM0qbC0CX3C_rUc/exec',
+                   'https://script.google.com/macros/s/AKfycbyiYBG9nMxrb1EazCVDyFVB6EKiglsJGyNDUMGU7gtfTJffrR9EbUM0qbC0CX3C_rUc/exec'];
+var GS_DEFAULT=GS_CANDIDATOS[0];
 function gsUrl(){ return (cfg.gsUrl&&/\/exec/.test(cfg.gsUrl))? cfg.gsUrl : GS_DEFAULT; }
 var URL_RE=/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/;
 
@@ -680,8 +683,13 @@ async function doLogin(ev){
   }
   if(!navigator.onLine){ err.hidden=false; err.textContent='Sem internet. Para entrar pela primeira vez neste celular, conecte-se a uma rede.'; btn.disabled=false; btn.textContent='Entrar'; return; }
   try{
-    var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'login',usuario:u,senha:p}),redirect:'follow'});
-    var j=await res.json();
+    var j=null, ultErr=null, tentar=cfg.gsUrl? [gsUrl()] : GS_CANDIDATOS;
+    for(var ci=0; ci<tentar.length && !j; ci++){
+      try{ var res=await fetch(tentar[ci],{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'login',usuario:u,senha:p}),redirect:'follow'});
+        j=await res.json(); if(!cfg.gsUrl && tentar.length>1){ cfg.gsUrl=tentar[ci]; saveCfg(); } }
+      catch(x){ ultErr=x; }
+    }
+    if(!j) throw ultErr||new Error('sem resposta');
     if(!j.ok){ err.hidden=false; err.textContent=j.erro||'Usuário ou senha incorretos.'; return; }
     if(!j.token||!j.perfil){ err.hidden=false; err.textContent='Esse endereço não é o do script de materiais. Confira se colou o endereço da planilha MATRIZ_CAJAMAR_MATERIAIS (e não o do RDO ou do FVS).'; return; }
     if(s0&&s0.token&&s0.token!==j.token){ try{ fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'sair',token:s0.token}),redirect:'follow'}); }catch(x){} }

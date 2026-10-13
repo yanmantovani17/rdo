@@ -1,5 +1,5 @@
 // Mantém o app funcionando sem internet. Ao publicar uma nova versão, troque VERSAO.
-const VERSAO = 'mat-v1';
+const VERSAO = 'mat-v2';
 const ARQUIVOS = ['./', 'index.html', 'app.js', 'carga.js', 'xlsx.mini.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSAO).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
