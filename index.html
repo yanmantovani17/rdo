@@ -1150,9 +1150,9 @@ var APP_VERSION=13;
 if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{ r.update(); }catch(e){} }).catch(function(){}); }); }
 async function forceUpdate(){
   var b=$('#updBtn'); if(b){ b.disabled=true; b.textContent='Atualizando…'; }
-  // só o cache e o service worker do RDO (o app de FVS, em /fvs/, tem os dele)
-  try{ if(window.caches){ var ks=await caches.keys(); await Promise.all(ks.filter(function(k){ return !/^(fvs-|status-fvs)/.test(k); }).map(function(k){ return caches.delete(k); })); } }catch(e){}
-  try{ if(navigator.serviceWorker){ var rs=await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.filter(function(r){ return !/\/fvs\/$/.test(r.scope); }).map(function(r){ return r.unregister(); })); } }catch(e){}
+  // só o cache e o service worker do RDO (os apps de FVS e de Material, em /fvs/ e /material/, têm os deles)
+  try{ if(window.caches){ var ks=await caches.keys(); await Promise.all(ks.filter(function(k){ return !/^(fvs-|status-fvs|mat-)/.test(k); }).map(function(k){ return caches.delete(k); })); } }catch(e){}
+  try{ if(navigator.serviceWorker){ var rs=await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.filter(function(r){ return !/\/(fvs|material)\/$/.test(r.scope); }).map(function(r){ return r.unregister(); })); } }catch(e){}
   location.replace(location.pathname+'?v='+Date.now());
 }
 async function checkVersion(){

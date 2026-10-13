@@ -19,3 +19,11 @@ No iPhone: abra no Safari → Compartilhar → "Adicionar à Tela de Início".
 ## Google Sheets / Power BI
 O script `google-sheets/Codigo.gs` vai na planilha (Extensões → Apps Script) e recebe os RDOs enviados pelo app nas abas Dias, Producao, Efetivo, Equipamentos e Clima.
 O script `google-sheets/FVS.gs` vai numa planilha separada e recebe as FVS enviadas pelo app de FVS nas abas FVS, Itens e Indicadores (% de aprovação por processo e por mês).
+
+# Controle de Material – previsto × real
+
+App de celular para controlar a perda de material: a engenharia cadastra o projeto (material, unidade, código da peça, nº de peças, quantidade por peça) e o campo lança o que foi executado e o que chegou (NF, caminhão, quantidade). Mostra a perda por material, por tipo de peça e por mês.
+
+**Abrir / instalar:** https://yanmantovani17.github.io/rdo/material/
+
+O script `google-sheets/Materiais.gs` vai na planilha de materiais (Extensões → Apps Script) e grava as abas Indicadores, Lancamentos, Entregas, Pecas, Projeto, Materiais e Usuarios (com a coluna Perfil: Engenharia ou Campo).

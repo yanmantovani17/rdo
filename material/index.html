@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Material">
+<meta name="theme-color" content="#26313b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>Material</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Same visual system as the RDO app: asphalt header, signal-yellow accents, field cards, fixed action bar. */
+:root{
+  --bg:#eef0ee; --surface:#ffffff; --surface-2:#f5f6f4; --ink:#1d2329; --muted:#5d6670; --line:#d5d9d6;
+  --asphalt:#26313b; --asphalt-ink:#f3f5f2; --signal:#e8a100; --signal-ink:#1d2329; --signal-soft:#fff3d1;
+  --ok:#2f7d4f; --ok-soft:#e1f1e7; --warn:#b4561b; --warn-soft:#fbe8dc; --na:#6b7580; --na-soft:#e7eaec; --focus:#1f6fb2;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14191e; --surface:#1d242b; --surface-2:#232b33; --ink:#e9ece9; --muted:#9aa4ad; --line:#323c46;
+  --asphalt:#0d1115; --asphalt-ink:#e9ece9; --signal:#f2b322; --signal-ink:#14191e; --signal-soft:#3a2f12;
+  --ok:#5cc187; --ok-soft:#173326; --warn:#f0925a; --warn-soft:#3b2318; --na:#9aa4ad; --na-soft:#2a323a; --focus:#6cb3f0; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14191e; --surface:#1d242b; --surface-2:#232b33; --ink:#e9ece9; --muted:#9aa4ad; --line:#323c46;
+  --asphalt:#0d1115; --asphalt-ink:#e9ece9; --signal:#f2b322; --signal-ink:#14191e; --signal-soft:#3a2f12;
+  --ok:#5cc187; --ok-soft:#173326; --warn:#f0925a; --warn-soft:#3b2318; --na:#9aa4ad; --na-soft:#2a323a; --focus:#6cb3f0; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.4;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.wrap{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:14px 120px;display:flex;flex-direction:column;gap:14px}
+
+/* header */
+.top{position:sticky;top:0;padding-top:env(safe-area-inset-top,0px);z-index:20;background:var(--asphalt);color:var(--asphalt-ink)}
+.top-in{max-width:720px;margin:0 auto;padding:10px 16px 0;display:flex;flex-direction:column;gap:8px}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:40px}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:1.15rem;letter-spacing:.06em;text-transform:uppercase;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.brand small{display:block;font-family:var(--f-body);font-weight:500;font-size:.72rem;letter-spacing:.08em;opacity:.7}
+.sync{font-size:.75rem;opacity:.8;white-space:nowrap}
+.back{background:transparent;border:1px solid rgba(255,255,255,.25);color:inherit;border-radius:8px;min-width:40px;height:40px;font-size:1.3rem;cursor:pointer;flex:none}
+.fhead{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.fhead .t{min-width:0;flex:1}
+.fhead .t b{display:block;font-family:var(--f-display);font-weight:700;font-size:1.05rem;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fhead .t span{display:block;font-size:.78rem;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.numtag{font-family:var(--f-mono);font-weight:600;background:var(--signal);color:var(--signal-ink);border-radius:6px;padding:2px 8px;font-size:.85rem;white-space:nowrap;flex:none}
+.tabs{display:flex;gap:2px}
+.tabs button{flex:1;background:transparent;border:0;color:inherit;opacity:.65;padding:10px 4px 9px;font-family:var(--f-display);font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:.9rem;border-bottom:3px solid transparent;cursor:pointer;position:relative}
+.tabs button[aria-selected="true"]{opacity:1;border-bottom-color:var(--signal)}
+.tabs .cnt{font-family:var(--f-mono);font-size:.72rem;background:var(--warn);color:#fff;border-radius:999px;padding:0 6px;margin-left:4px;vertical-align:2px}
+.hazard{height:5px;background:repeating-linear-gradient(-45deg,var(--signal) 0 10px,var(--asphalt) 10px 20px)}
+
+/* cards & fields */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.card>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px}
+.card>summary::-webkit-details-marker{display:none}
+.card>summary h2{margin:0;font-family:var(--f-display);font-weight:700;font-size:1.15rem;letter-spacing:.05em;text-transform:uppercase}
+.card>summary .sum{margin-left:auto;font-size:.82rem;color:var(--muted);text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
+.card>summary .chev{transition:transform .15s;color:var(--muted)}
+.card[open]>summary .chev{transform:rotate(90deg)}
+.pad{padding:14px;display:flex;flex-direction:column;gap:12px}
+.body{padding:0 14px 16px;display:flex;flex-direction:column;gap:14px}
+.dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--line);flex:none}
+.dot.on{background:var(--ok);border-color:var(--ok)}
+.lbl{font-size:.75rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:6px}
+input[type=text],input[type=search],input[type=date],select,textarea{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:44px}
+textarea{resize:vertical;min-height:72px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{min-width:0}
+.grow{flex:1}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.grid2>*{min-width:0}
+.note{font-size:.88rem;color:var(--muted);margin:0}
+.sheet-h{font-family:var(--f-display);font-weight:700;font-size:1.3rem;letter-spacing:.05em;text-transform:uppercase;margin:4px 0 0}
+
+/* buttons & chips */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-weight:600;cursor:pointer;text-decoration:none;color:inherit}
+.btn.pri{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
+.btn.dark{background:var(--asphalt);border-color:var(--asphalt);color:var(--asphalt-ink)}
+.btn.ghost{background:transparent;border-style:dashed}
+.btn.danger{color:var(--warn);border-color:var(--warn);background:transparent}
+.btn.sm{min-height:38px;padding:6px 12px;font-size:.9rem}
+.btn[disabled]{opacity:.55;cursor:default}
+.btn.full{width:100%}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:7px 12px;min-height:38px;cursor:pointer;font-weight:500;font-size:.9rem}
+.chip[aria-pressed="true"]{background:var(--asphalt);border-color:var(--asphalt);color:var(--asphalt-ink)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .chip[aria-pressed="true"]{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}}
+.chips.scroll{flex-wrap:nowrap;overflow-x:auto;margin-inline:-16px;padding-inline:16px;scrollbar-width:none}
+.chips.scroll::-webkit-scrollbar{display:none}
+.chips.scroll .chip{white-space:nowrap;flex:none}
+
+/* dashboard */
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 10px 9px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-width:0;border-top:4px solid var(--line)}
+.tile b{font-family:var(--f-mono);font-size:1.6rem;line-height:1.1}
+.tile span{font-size:.78rem;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;line-height:1.15}
+.tile.and{border-top-color:var(--signal)} .tile.pend{border-top-color:var(--warn)} .tile.ok{border-top-color:var(--ok)}
+.tile[aria-pressed="true"]{outline:2px solid var(--ink);outline-offset:-2px}
+.list{display:flex;flex-direction:column;gap:8px}
+.frow{display:flex;gap:10px;align-items:stretch;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;cursor:pointer;text-align:left;width:100%;border-left:5px solid var(--line)}
+.frow.and{border-left-color:var(--signal)} .frow.pend{border-left-color:var(--warn)} .frow.ok{border-left-color:var(--ok)}
+.frow .grow{min-width:0;display:flex;flex-direction:column;gap:2px}
+.frow .tt{font-weight:600;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.frow .loc{font-size:.92rem}
+.frow .meta{font-size:.8rem;color:var(--muted)}
+.frow .n{font-family:var(--f-mono);font-weight:600;font-size:.85rem;color:var(--muted);flex:none;min-width:2.6em}
+.badge{display:inline-block;font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;border-radius:5px;padding:1px 7px;white-space:nowrap}
+.badge.and{background:var(--signal-soft);color:var(--ink)} .badge.pend{background:var(--warn-soft);color:var(--warn)} .badge.ok{background:var(--ok-soft);color:var(--ok)}
+.bar-mini{height:5px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-top:4px}
+.bar-mini i{display:block;height:100%;background:var(--ok)}
+.empty{text-align:center;padding:28px 12px;color:var(--muted);border:2px dashed var(--line);border-radius:var(--r)}
+.empty b{display:block;color:var(--ink);font-family:var(--f-display);font-size:1.2rem;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
+
+/* template picker */
+.tpl{display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;width:100%;text-align:left}
+.tpl .code{font-family:var(--f-mono);font-weight:600;font-size:.8rem;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;flex:none;min-width:3.6em;text-align:center}
+.tpl .grow{min-width:0}
+.tpl .tt{display:block;font-weight:600;font-size:.95rem;line-height:1.25}
+.tpl .meta{display:block;font-size:.78rem;color:var(--muted);margin-top:2px}
+.picked{border-left:6px solid var(--signal)}
+
+/* checklist */
+.ck{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px dashed var(--line);cursor:pointer}
+.ck:first-of-type{border-top:0}
+.ck input{width:22px;height:22px;flex:none;margin:1px 0 0;accent-color:var(--ok)}
+.ckgrp{display:flex;flex-direction:column}
+.ckgrp h3{margin:6px 0 2px;font-family:var(--f-display);font-weight:600;font-size:1rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.sec-h{font-family:var(--f-display);font-weight:700;font-size:1.05rem;letter-spacing:.05em;text-transform:uppercase;margin:10px 0 -4px;color:var(--muted)}
+
+/* item card */
+.it{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:10px;scroll-margin-top:150px}
+.it.s-A{border-left-color:var(--ok)} .it.s-NA{border-left-color:var(--na)} .it.s-R{border-left-color:var(--warn)} .it.s-RA{border-left-color:var(--ok)}
+.it.flash{animation:flash 1.4s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 4px var(--signal)}100%{box-shadow:0 0 0 0 transparent}}
+.it-h{display:flex;gap:10px;align-items:flex-start}
+.it-h .n{font-family:var(--f-mono);font-size:.8rem;color:var(--muted);flex:none;padding-top:2px;min-width:1.6em}
+.it-h .grow{min-width:0}
+.it-h b{font-weight:600;line-height:1.25;display:block}
+.it-h .oq{font-size:.93rem;line-height:1.3;margin-top:2px}
+.crit{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 10px;margin:0;font-size:.86rem;background:var(--surface-2);border-radius:8px;padding:8px 10px}
+.crit dt{color:var(--muted);font-weight:600;font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;padding-top:2px}
+.crit dd{margin:0}
+.crit dd.acc{font-weight:600}
+.ver{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ver .lbl{min-width:6.6em}
+.seg3{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex:none}
+.seg3 button{min-width:58px;height:46px;border:0;border-left:1px solid var(--line);background:var(--surface-2);font-family:var(--f-display);font-weight:700;font-size:1.1rem;letter-spacing:.04em;cursor:pointer}
+.seg3 button:first-child{border-left:0}
+.seg3 button[data-c="A"][aria-pressed="true"]{background:var(--ok);color:#fff}
+.seg3 button[data-c="R"][aria-pressed="true"]{background:var(--warn);color:#fff}
+.seg3 button[data-c="NA"][aria-pressed="true"]{background:var(--na);color:#fff}
+.who{font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
+.rep{display:flex;flex-direction:column;gap:10px;border-top:1px dashed var(--warn);padding-top:10px}
+.rep .lbl{color:var(--warn)}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}
+.th{width:84px;height:84px;border-radius:8px;background:var(--surface-2) center/cover no-repeat;border:1px solid var(--line);position:relative;flex:none}
+.th .x{position:absolute;top:-8px;right:-8px;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:1rem;line-height:1;color:var(--muted)}
+.addph{width:84px;height:84px;border:2px dashed var(--line);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;font-size:.78rem;font-weight:600;text-align:center;flex:none}
+.addph input{display:none}
+.addph .ico{font-size:1.4rem;line-height:1}
+.linkbtn{background:none;border:0;padding:4px 0;color:var(--focus);font-weight:600;cursor:pointer;font-size:.9rem;align-self:flex-start}
+
+/* signatures */
+.sigs{display:flex;flex-direction:column;gap:12px}
+.sig{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--surface-2);display:flex;flex-direction:column;gap:8px}
+.sig h3{margin:0;font-family:var(--f-display);font-weight:700;font-size:1rem;letter-spacing:.06em;text-transform:uppercase}
+.sigimg{height:70px;border-radius:6px;background:#fff center/contain no-repeat;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;color:#7b848c;font-size:.88rem;cursor:pointer}
+
+/* overlay */
+.ov{position:fixed;inset:0;z-index:50;background:rgba(10,14,18,.6);display:flex;align-items:flex-end;justify-content:center}
+.ov-box{background:var(--surface);width:100%;max-width:720px;border-radius:14px 14px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px;max-height:92vh;overflow:auto}
+.ov-box h2{margin:0;font-family:var(--f-display);font-weight:700;font-size:1.25rem;letter-spacing:.05em;text-transform:uppercase}
+#padCanvas{width:100%;height:min(46vh,260px);background:#fff;border:1px solid var(--line);border-radius:8px;touch-action:none;display:block}
+
+/* bottom bar */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+.bar-in{max-width:720px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.bar .prog{font-size:.8rem;color:var(--muted);line-height:1.2;flex:none;max-width:40%}
+.bar .prog b{display:block;font-family:var(--f-mono);color:var(--ink);font-size:1rem}
+.bar .btn{flex:1}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--asphalt);color:var(--asphalt-ink);padding:10px 16px;border-radius:8px;z-index:60;max-width:calc(100% - 32px);font-size:.92rem;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.msg{font-size:.9rem;border-radius:8px;padding:10px 12px;background:var(--ok-soft);color:var(--ink)}
+.msg.err{background:var(--warn-soft)}
+.pendrow .it-h b{font-size:.95rem}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:380px){ .seg3 button{min-width:50px} .ver .lbl{min-width:0;width:100%} }
+/* ---- mesmo padrão do RDO: login, botão Salvar, arrastar para apagar, confirmação, logo ---- */
+.brand h1{flex:1;min-width:0}
+.hdr-save{flex:none;background:var(--signal);color:var(--signal-ink);border:0;border-radius:8px;padding:8px 14px;min-height:38px;font-family:var(--f-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.95rem;cursor:pointer}
+.hdr-save.ok{background:var(--ok);color:#fff}
+.hdr-save:disabled{opacity:.7}
+@media (max-width:480px){ .brand .sync{display:none} .brand h1{font-size:1.05rem} }
+.swipe{position:relative;border-radius:var(--r);overflow:hidden;background:var(--warn)}
+.swipe .frow{position:relative;z-index:1;transition:transform .2s ease;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.swipe.drag .frow{transition:none}
+.swipe .del{position:absolute;top:0;bottom:0;width:104px;border:0;background:var(--warn);color:#fff;font-weight:700;font-size:1rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer}
+.swipe .del-l{left:0}.swipe .del-r{right:0}
+.swipe .del svg{width:22px;height:22px}
+.hint{font-size:.8rem;color:var(--muted)}
+.sent{font-size:.78rem;color:var(--muted)} .sent.wait{color:var(--warn)}
+#cfmBack{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;padding:16px}
+#cfmBox{width:100%;max-width:480px;background:var(--surface);color:var(--ink);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;margin-bottom:env(safe-area-inset-bottom,0px)}
+#cfmBox h3{margin:0;font-family:var(--f-display);font-size:1.25rem;letter-spacing:.04em;text-transform:uppercase}
+#cfmBox p{margin:0;color:var(--muted);font-size:.95rem}
+#cfmBox .btn.danger{background:var(--warn);border-color:var(--warn);color:#fff}
+body.locked > *:not(#login):not(#cfmBack):not(#toast):not(script){display:none!important}
+#login{position:fixed;inset:0;z-index:60;background:var(--asphalt);color:var(--asphalt-ink);display:flex;flex-direction:column;overflow-y:auto}
+#login .hz{height:6px;background:repeating-linear-gradient(-45deg,var(--signal) 0 10px,var(--asphalt) 10px 20px);flex:none}
+#login .in{width:100%;max-width:420px;margin:auto;padding:calc(env(safe-area-inset-top,0px) + 32px) 24px calc(env(safe-area-inset-bottom,0px) + 32px);display:flex;flex-direction:column;gap:14px}
+#login img{width:84px;height:84px;border-radius:20px;align-self:flex-start}
+#login img.logo{width:auto;height:auto;max-width:240px;max-height:72px;border-radius:8px;background:#fff;padding:8px}
+.logo-box{border:1px dashed var(--line);border-radius:8px;background:#fff;min-height:84px;display:flex;align-items:center;justify-content:center;padding:10px;text-align:center;color:#555;font-size:.85rem}
+.logo-box img{max-width:100%;max-height:90px;display:block}
+#login h1{font-family:var(--f-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:1.7rem;margin:6px 0 0;line-height:1.1}
+#login .sub{opacity:.75;font-size:.95rem;margin:0}
+#login label{display:flex;flex-direction:column;gap:6px;font-size:.75rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;opacity:.9}
+#login input{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.22);color:var(--asphalt-ink);border-radius:8px;padding:12px;min-height:48px;font-size:1rem;text-transform:none;letter-spacing:0;color-scheme:dark}
+#login input:focus-visible{outline:3px solid var(--signal);outline-offset:1px}
+#login .btn{min-height:50px;font-size:1.05rem}
+#login .err{background:rgba(240,146,90,.18);border:1px solid rgba(240,146,90,.5);border-radius:8px;padding:10px 12px;font-size:.92rem}
+#login .foot{font-size:.82rem;opacity:.6;margin-top:6px}
+
+/* ---- Controle de Material ---- */
+input[type=number],input.num{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:44px;font-family:var(--f-mono);text-align:right}
+.mcard{display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer;text-align:left;width:100%}
+.mcard.ok{border-left-color:var(--ok)} .mcard.pend{border-left-color:var(--warn)} .mcard.na{border-left-color:var(--na)}
+.mcard .mtop{display:flex;align-items:flex-start;gap:10px}
+.mcard .mtop .grow{min-width:0;display:flex;flex-direction:column;gap:2px}
+.mcard .nm{font-family:var(--f-display);font-weight:700;font-size:1.15rem;letter-spacing:.03em;text-transform:uppercase;line-height:1.15}
+.mcard .sub{font-size:.8rem;color:var(--muted)}
+.pct{font-family:var(--f-mono);font-weight:600;font-size:1.45rem;line-height:1;text-align:right;flex:none}
+.pct small{display:block;font-family:var(--f-body);font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.pct.ok{color:var(--ok)} .pct.pend{color:var(--warn)} .pct.na{color:var(--muted)}
+.nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.nums div{background:var(--surface-2);border-radius:7px;padding:6px 8px;min-width:0}
+.nums b{display:block;font-family:var(--f-mono);font-size:.98rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nums span{font-size:.68rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.prog2{display:flex;flex-direction:column;gap:3px}
+.prog2 .t{display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted)}
+.prog2 .b{height:7px;border-radius:4px;background:var(--surface-2);overflow:hidden}
+.prog2 .b i{display:block;height:100%;background:var(--signal)}
+.warnline{font-size:.82rem;color:var(--warn);font-weight:600}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;min-width:0}
+.kpi b{display:block;font-family:var(--f-mono);font-size:1.25rem;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi span{display:block;font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.kpi em{display:block;font-style:normal;font-size:.78rem;color:var(--muted);margin-top:2px}
+.kpi.big{grid-column:1/-1;border-top:4px solid var(--line)}
+.kpi.big.ok{border-top-color:var(--ok)} .kpi.big.pend{border-top-color:var(--warn)}
+.kpi.big b{font-size:2rem}
+.tbl{width:100%;border-collapse:collapse;font-size:.88rem;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.tbl th{font-size:.68rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:right;padding:8px 8px;background:var(--surface-2);white-space:nowrap}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl td{padding:8px 8px;border-top:1px solid var(--line);text-align:right;font-family:var(--f-mono);font-size:.84rem;white-space:nowrap}
+.tbl td:first-child{font-family:var(--f-body);white-space:normal}
+.tbl td small{display:block;font-family:var(--f-body);color:var(--muted);font-size:.72rem}
+.tbl tr.grp td{background:var(--surface-2);font-family:var(--f-display);font-weight:700;letter-spacing:.05em;text-transform:uppercase;font-size:.8rem;color:var(--muted);text-align:left}
+.tbl tr[data-it]{cursor:pointer}
+.tblwrap{overflow-x:auto;margin-inline:-2px}
+.c-ok{color:var(--ok)} .c-pend{color:var(--warn)} .c-na{color:var(--muted)}
+.lrow{display:flex;gap:10px;align-items:stretch;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:var(--r);padding:10px 12px;cursor:pointer;text-align:left;width:100%}
+.lrow.ok{border-left-color:var(--ok)} .lrow.pend{border-left-color:var(--warn)} .lrow.na{border-left-color:var(--na)}
+.lrow .d{font-family:var(--f-mono);font-weight:600;font-size:.85rem;flex:none;min-width:3.2em;color:var(--muted);line-height:1.2}
+.lrow .d b{display:block;color:var(--ink);font-size:1.05rem}
+.lrow .grow{min-width:0;display:flex;flex-direction:column;gap:2px}
+.lrow .tt{font-weight:600;line-height:1.25}
+.lrow .pc{font-size:.88rem;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.lrow .meta{font-size:.8rem;color:var(--muted)}
+.lrow .r{flex:none;text-align:right;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.lrow .r b{font-family:var(--f-mono);font-size:1rem}
+.swipe .lrow{position:relative;z-index:1;transition:transform .2s ease;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.swipe.drag .lrow{transition:none}
+.mhead{font-family:var(--f-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-size:.9rem;margin:6px 0 -2px}
+.pc-row,.en-row,.pj-row{display:grid;gap:6px;align-items:center;padding:8px 0;border-top:1px dashed var(--line)}
+.pc-row:first-child,.en-row:first-child,.pj-row:first-child{border-top:0}
+.pc-row{grid-template-columns:minmax(0,1fr) auto auto}
+.pc-row .cod{font-family:var(--f-mono);font-weight:600;font-size:.85rem;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-right:6px}
+.pc-row .v{font-family:var(--f-mono);font-size:.88rem;white-space:nowrap}
+.pc-row .w{grid-column:1/-1;font-size:.78rem;color:var(--warn);font-weight:600}
+.en-row{grid-template-columns:minmax(0,1.25fr) minmax(0,.8fr) minmax(0,1fr) auto}
+.pj-row{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto}
+.xbtn{width:38px;height:38px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:1.15rem;cursor:pointer;flex:none}
+.colh{display:grid;gap:6px;font-size:.68rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tot{display:flex;justify-content:space-between;align-items:baseline;font-size:.88rem;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
+.tot b{font-family:var(--f-mono);color:var(--ink);font-size:1rem}
+.sumbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;flex:1;min-width:0}
+.sumbar div{min-width:0;line-height:1.1}
+.sumbar span{display:block;font-size:.64rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sumbar b{font-family:var(--f-mono);font-size:.95rem;white-space:nowrap}
+.bar .btn.fixed{flex:none}
+.it-card{display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;width:100%;text-align:left}
+.it-card .code{font-family:var(--f-mono);font-weight:600;font-size:.82rem;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;flex:none;min-width:3.6em;text-align:center}
+.it-card .grow{min-width:0}
+.it-card .tt{display:block;font-weight:600;font-size:.95rem;line-height:1.25}
+.it-card .meta{display:block;font-size:.8rem;color:var(--muted)}
+.it-card .q{font-family:var(--f-mono);font-size:.9rem;flex:none;text-align:right}
+.ro-note{background:var(--signal-soft);border-radius:8px;padding:10px 12px;font-size:.9rem}
+.testband{background:var(--signal);color:var(--signal-ink);text-align:center;font-size:.8rem;font-weight:600;padding:3px 8px}
+.calc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.preview{font-size:.85rem;background:var(--surface-2);border-radius:8px;padding:8px 10px;max-height:200px;overflow:auto;font-family:var(--f-mono);white-space:pre-wrap}
+select{appearance:auto}
+.seg2{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.seg2 button{flex:1;min-height:42px;border:0;border-left:1px solid var(--line);background:var(--surface-2);font-weight:600;cursor:pointer}
+.seg2 button:first-child{border-left:0}
+.seg2 button[aria-pressed="true"]{background:var(--asphalt);color:var(--asphalt-ink)}
+@media (max-width:400px){ .nums b{font-size:.88rem} .en-row{grid-template-columns:minmax(0,1fr) minmax(0,.75fr) minmax(0,.9fr) auto} }
+</style>
+</head>
+<body class="locked">
+<div id="login" hidden>
+  <div class="hz"></div>
+  <form class="in" id="loginForm" autocomplete="on" novalidate>
+    <img src="icon-192.png" alt="">
+    <h1 id="loginObra">Controle de Material</h1>
+    <p class="sub">Previsto no projeto × usado de verdade. Entre com o usuário e a senha cadastrados na aba Usuarios da planilha de materiais.</p>
+    <label id="lgUrlBox" hidden>Endereço do script da planilha (termina em /exec)<input type="text" id="lgUrl" inputmode="url" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <label>Usuário<input type="text" id="lgUser" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
+    <label>Senha<input type="password" id="lgPass" name="password" autocomplete="current-password" required></label>
+    <div class="err" id="lgErr" hidden></div>
+    <button type="submit" class="btn pri" id="lgBtn">Entrar</button>
+    <button type="button" class="btn" id="lgTeste" style="background:transparent;color:inherit;border-color:rgba(255,255,255,.3)">Testar sem planilha (só neste celular)</button>
+    <p class="foot">Não tem acesso? Fale com o responsável pela obra.</p>
+  </form>
+</div>
+<header class="top">
+  <div class="testband" id="testBand" hidden>MODO TESTE · nada vai para a planilha</div>
+  <div class="top-in">
+    <div class="brand" id="brandMain">
+      <h1 id="obraName">Material<small>Controle de Material</small></h1>
+      <span class="sync" id="sync">carregando…</span>
+      <button type="button" class="hdr-save" id="hdrSync" aria-label="Sincronizar com a planilha">Atualizar</button>
+    </div>
+    <div class="brand" id="brandSub" hidden>
+      <div class="fhead">
+        <button type="button" class="back" id="backBtn" aria-label="Voltar">‹</button>
+        <div class="t"><b id="subTitle">—</b><span id="subMeta"></span></div>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button role="tab" id="tab-painel" aria-selected="true" data-view="painel">Painel</button>
+      <button role="tab" id="tab-lancs" aria-selected="false" data-view="lancs">Lançamentos</button>
+      <button role="tab" id="tab-proj" aria-selected="false" data-view="proj">Projeto</button>
+      <button role="tab" id="tab-obra" aria-selected="false" data-view="obra">Obra</button>
+    </nav>
+    <div style="height:8px" id="subGap" hidden></div>
+  </div>
+  <div class="hazard"></div>
+</header>
+
+<!-- PAINEL -->
+<main class="wrap" id="view-painel">
+  <div class="list" id="mcards"></div>
+</main>
+
+<!-- MATERIAL (detalhe) -->
+<main class="wrap" id="view-mat" hidden></main>
+
+<!-- LANÇAMENTOS -->
+<main class="wrap" id="view-lancs" hidden>
+  <div class="chips scroll" id="lfil"></div>
+  <input type="search" id="lq" placeholder="Buscar por peça, local, NF ou caminhão" aria-label="Buscar lançamentos">
+  <div class="list" id="llist"></div>
+</main>
+
+<!-- FORMULÁRIO DE LANÇAMENTO -->
+<main class="wrap" id="view-form" hidden>
+  <div class="card pad">
+    <div class="grid2">
+      <label class="field"><span class="lbl">Data</span><input type="date" id="fData"></label>
+      <label class="field"><span class="lbl">Material</span><select id="fMat"></select></label>
+    </div>
+    <div class="grid2">
+      <label class="field"><span class="lbl">Frente / serviço</span><input type="text" id="fFrente" list="dlFrente" placeholder="Ex.: Fundações Galpão B"></label>
+      <label class="field"><span class="lbl">Fornecedor</span><input type="text" id="fForn" list="dlForn" placeholder="Ex.: Concreteira"></label>
+    </div>
+    <datalist id="dlFrente"></datalist><datalist id="dlForn"></datalist>
+  </div>
+
+  <h2 class="sec-h">1 · O que foi executado <span style="font-weight:500;text-transform:none;letter-spacing:0">(previsto)</span></h2>
+  <div class="card pad" id="fPecasCard">
+    <div id="fPecas"></div>
+    <div class="tot"><span>Previsto pelo projeto</span><b id="fPrevTot">0</b></div>
+    <p class="note" id="fSemItens" hidden></p>
+    <div id="fAddPeca" class="pad" style="padding:10px;background:var(--surface-2);border-radius:8px">
+      <label class="field"><span class="lbl">Tipo de peça / item do projeto</span><select id="fItem"></select></label>
+      <label class="field"><span class="lbl">Local / identificação (um por linha)</span><textarea id="fLocais" rows="2" placeholder="Ex.: P588&#10;P567"></textarea></label>
+      <div class="row"><label class="field grow" style="max-width:9em"><span class="lbl">Qtd cada</span><input type="text" class="num" inputmode="decimal" id="fQtdPeca" value="1"></label>
+        <button type="button" class="btn dark grow" id="fAddPecaBtn" style="align-self:flex-end">Adicionar peça</button></div>
+    </div>
+    <button type="button" class="linkbtn" id="fAvulsoTgl">+ Serviço fora do projeto (avulso, com quantidade prevista)</button>
+    <div id="fAvulso" class="pad" style="padding:10px;background:var(--surface-2);border-radius:8px" hidden>
+      <label class="field"><span class="lbl">Descrição</span><input type="text" id="fAvDesc" placeholder="Ex.: Graute, base da cabine"></label>
+      <div class="grid2"><label class="field"><span class="lbl">Local</span><input type="text" id="fAvLocal"></label>
+        <label class="field"><span class="lbl">Previsto (<span class="unl"></span>)</span><input type="text" class="num" inputmode="decimal" id="fAvPrev"></label></div>
+      <button type="button" class="btn dark" id="fAvAdd">Adicionar avulso</button>
+    </div>
+  </div>
+
+  <h2 class="sec-h">2 · O que chegou / foi usado <span style="font-weight:500;text-transform:none;letter-spacing:0">(real)</span></h2>
+  <div class="card pad">
+    <div class="colh en-row" style="padding:0;border:0"><span>NF / documento</span><span>Caminhão / BT</span><span>Qtd (<span class="unl"></span>)</span><span style="width:38px"></span></div>
+    <div id="fEnts"></div>
+    <button type="button" class="btn ghost" id="fAddEnt">+ Caminhão / NF / retirada</button>
+    <div class="tot"><span>Recebido</span><b id="fRecTot">0</b></div>
+  </div>
+
+  <h2 class="sec-h">3 · Ajustes (se houver)</h2>
+  <div class="card pad">
+    <label class="field"><span class="lbl">Sobra que voltou / devolvida (<span class="unl"></span>) – desconta do real</span><input type="text" class="num" inputmode="decimal" id="fDev" placeholder="0"></label>
+    <div class="field"><span class="lbl">Perdas justificadas (já estão dentro do real)</span>
+      <div id="fPerdas"></div>
+      <button type="button" class="linkbtn" id="fAddPerda">+ Perda justificada (bomba, descarte, CP…)</button></div>
+    <label class="field"><span class="lbl">Observação</span><textarea id="fObs" rows="2" placeholder="Ex.: caminhão chegou com slump fora, devolvido 2 m³"></textarea></label>
+  </div>
+  <p class="note" id="fWho"></p>
+  <button type="button" class="btn danger full" id="fDel" hidden>Apagar este lançamento</button>
+</main>
+
+<!-- PROJETO -->
+<main class="wrap" id="view-proj" hidden>
+  <div class="ro-note" id="projRO" hidden>Seu perfil é <b>Campo</b>: você consulta o projeto, mas só a engenharia altera. Para lançar consumo, use o botão de baixo.</div>
+  <p class="note">Cada material tem a sua unidade (m³, kg, m², un, saco…). Dentro dele, cadastre os itens do projeto: código da peça, nº de peças e quanto cada uma leva.</p>
+  <div class="list" id="plist"></div>
+  <div id="projSeed" hidden class="card pad">
+    <b>Começar com a sua planilha de concreto?</b>
+    <p class="note">Carrega as sapatas do Galpão A e B (abas GA e GB), os 44 dias de concretagem de 25/03 a 19/06 com as NFs, e o concreto magro. Dá para editar ou apagar tudo depois.</p>
+    <button type="button" class="btn pri" id="seedBtn">Carregar planilha de perda de concreto</button>
+  </div>
+</main>
+
+<!-- MATERIAL (edição + itens) -->
+<main class="wrap" id="view-medit" hidden></main>
+
+<!-- OBRA -->
+<main class="wrap" id="view-obra" hidden>
+  <h2 class="sheet-h">Obra</h2>
+  <div class="card pad">
+    <label class="field"><span class="lbl">Nome da obra</span><input type="text" id="c-obra" placeholder="Ex.: Cajamar"></label>
+    <p class="note">Salvo sozinho enquanto você digita.</p>
+  </div>
+  <h2 class="sheet-h">Planilha Google</h2>
+  <p class="note" id="gsNote">Cada lançamento salvo vai para a planilha de materiais (abas Lancamentos, Entregas, Pecas e Indicadores). O app também baixa de lá o projeto e os lançamentos das outras pessoas. Sem internet, guarda e envia depois.</p>
+  <div class="card pad" id="gsCard">
+    <label class="field"><span class="lbl">Endereço do App da Web</span><input type="text" id="gsUrl" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <button type="button" class="btn dark full" id="gsSave">Salvar e testar</button>
+    <div id="gsStatus" class="msg" hidden></div>
+    <p class="note" id="gsInfo"></p>
+    <div class="row"><button type="button" class="btn grow" id="gsSendAll">Reenviar tudo</button><button type="button" class="btn grow" id="gsPull">Baixar da planilha</button></div>
+  </div>
+  <h2 class="sheet-h">Relatório</h2>
+  <p class="note">Excel com o resumo por material, a perda por tipo de peça, os lançamentos, as NFs e o projeto.</p>
+  <button type="button" class="btn pri full" id="xlsBtn">Exportar controle em Excel</button>
+  <h2 class="sheet-h">Backup</h2>
+  <p class="note">A planilha Google já guarda tudo. O backup é uma cópia extra deste celular.</p>
+  <div class="row"><button type="button" class="btn grow" id="expBk">Exportar backup</button><label class="btn grow">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
+  <h2 class="sheet-h">Acesso</h2>
+  <div class="card pad" style="flex-direction:row;align-items:center;flex-wrap:wrap">
+    <div class="grow" style="min-width:0"><div class="lbl">Conectado como</div><strong id="acNome">—</strong></div>
+    <button type="button" class="btn" id="acSair">Sair</button>
+  </div>
+  <p class="note" id="verInfo" style="text-align:center"></p>
+</main>
+
+<div class="bar" id="bar">
+  <div class="bar-in">
+    <div class="sumbar" id="sumbar" hidden></div>
+    <button type="button" class="btn pri" id="barBtn">+ Lançar consumo</button>
+  </div>
+</div>
+
+<!-- editor de item de projeto -->
+<div class="ov" id="itOv" hidden>
+  <div class="ov-box">
+    <h2 id="itTit">Item de projeto</h2>
+    <div class="grid2">
+      <label class="field"><span class="lbl">Código</span><input type="text" id="itCod" placeholder="Ex.: S210" autocapitalize="characters"></label>
+      <label class="field"><span class="lbl">Grupo</span><input type="text" id="itGrupo" list="dlGrupo" placeholder="Ex.: Galpão B · Sapatas"></label>
+    </div>
+    <datalist id="dlGrupo"></datalist>
+    <label class="field"><span class="lbl">Descrição</span><input type="text" id="itDesc" placeholder="Ex.: Sapata S210"></label>
+    <div class="grid2">
+      <label class="field"><span class="lbl">Nº de peças no projeto</span><input type="text" class="num" inputmode="decimal" id="itN"></label>
+      <label class="field"><span class="lbl">Qtd por peça (<span class="unl"></span>)</span><input type="text" class="num" inputmode="decimal" id="itQu"></label>
+    </div>
+    <button type="button" class="linkbtn" id="itCalcTgl">Calcular pela medida (C × L × H)</button>
+    <div class="calc" id="itCalc" hidden>
+      <label class="field"><span class="lbl">Comp. (m)</span><input type="text" class="num" inputmode="decimal" id="itC"></label>
+      <label class="field"><span class="lbl">Larg. (m)</span><input type="text" class="num" inputmode="decimal" id="itL"></label>
+      <label class="field"><span class="lbl">Alt./esp. (m)</span><input type="text" class="num" inputmode="decimal" id="itH"></label>
+    </div>
+    <div class="tot"><span>Total previsto no projeto</span><b id="itTot">0</b></div>
+    <div class="row"><button type="button" class="btn danger" id="itDel">Apagar</button><span class="grow"></span><button type="button" class="btn" id="itCancel">Cancelar</button><button type="button" class="btn pri" id="itOk">Salvar</button></div>
+  </div>
+</div>
+<!-- colar do Excel -->
+<div class="ov" id="pasteOv" hidden>
+  <div class="ov-box">
+    <h2>Colar do Excel</h2>
+    <p class="note">No Excel, selecione as colunas <b>Código · Nº de peças · Qtd por peça</b> (uma quarta coluna com a descrição é opcional), copie e cole abaixo. Código que já existe neste material é atualizado.</p>
+    <label class="field"><span class="lbl">Grupo para esses itens</span><input type="text" id="psGrupo" list="dlGrupo" placeholder="Ex.: Galpão B · Sapatas"></label>
+    <textarea id="psTxt" rows="6" placeholder="S201&#9;1&#9;3,663&#10;S202&#9;27&#9;5,038"></textarea>
+    <div class="preview" id="psPrev">Nada colado ainda.</div>
+    <div class="row"><span class="grow"></span><button type="button" class="btn" id="psCancel">Cancelar</button><button type="button" class="btn pri" id="psOk" disabled>Importar</button></div>
+  </div>
+</div>
+<!-- arquivo pronto -->
+<div class="ov" id="readyOv" hidden>
+  <div class="ov-box">
+    <h2>Arquivo pronto</h2>
+    <p class="note" id="readyName"></p>
+    <button type="button" class="btn pri full" id="readyShare">Enviar / salvar (WhatsApp, e-mail, Arquivos)</button>
+    <a class="btn full" id="readyOpen" target="_blank" rel="noopener">Abrir o arquivo</a>
+    <button type="button" class="btn full" id="readyClose">Fechar</button>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+<div id="cfmBack" hidden><div id="cfmBox" role="dialog" aria-modal="true" aria-labelledby="cfmTit">
+  <h3 id="cfmTit">Apagar?</h3>
+  <p id="cfmTxt"></p>
+  <div class="row"><button type="button" class="btn grow" id="cfmNo">Cancelar</button><button type="button" class="btn danger grow" id="cfmYes">Apagar</button></div>
+</div></div>
+<div id="updBar" hidden style="position:fixed;left:16px;right:16px;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:40;background:var(--signal);color:var(--signal-ink);border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)">
+  <span style="flex:1;font-weight:600">Nova versão do app disponível.</span>
+  <button type="button" class="btn dark" id="updBtn">Atualizar agora</button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
