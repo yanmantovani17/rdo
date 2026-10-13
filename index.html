@@ -172,6 +172,19 @@ html,body{margin:0}
 body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 .top{top:0;padding-top:env(safe-area-inset-top,0px)}
 .backup{display:flex;gap:8px;flex-wrap:wrap}
+body.locked > *:not(#login):not(script){display:none!important}
+#login{position:fixed;inset:0;z-index:60;background:var(--asphalt);color:var(--asphalt-ink);display:flex;flex-direction:column;overflow-y:auto}
+#login .hz{height:6px;background:repeating-linear-gradient(-45deg,var(--signal) 0 10px,var(--asphalt) 10px 20px);flex:none}
+#login .in{width:100%;max-width:420px;margin:auto;padding:calc(env(safe-area-inset-top,0px) + 32px) 24px calc(env(safe-area-inset-bottom,0px) + 32px);display:flex;flex-direction:column;gap:14px}
+#login img{width:84px;height:84px;border-radius:20px;align-self:flex-start}
+#login h1{font-family:var(--f-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:1.7rem;margin:6px 0 0;line-height:1.1}
+#login .sub{opacity:.75;font-size:.95rem;margin:0}
+#login label{display:flex;flex-direction:column;gap:6px;font-size:.75rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;opacity:.9}
+#login input{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.22);color:var(--asphalt-ink);border-radius:8px;padding:12px;min-height:48px;font-size:1rem;text-transform:none;letter-spacing:0;color-scheme:dark}
+#login input:focus-visible{outline:3px solid var(--signal);outline-offset:1px}
+#login .btn{min-height:50px;font-size:1.05rem}
+#login .err{background:rgba(240,146,90,.18);border:1px solid rgba(240,146,90,.5);border-radius:8px;padding:10px 12px;font-size:.92rem}
+#login .foot{font-size:.82rem;opacity:.6;margin-top:6px}
 .prod-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
 .prod-grid>*{min-width:0}
 .prod-qty{display:flex;gap:8px;align-items:center}
@@ -185,8 +198,21 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
 .cad-empty{font-size:.88rem;color:var(--muted);padding:4px 0}
 </style>
 </head>
-<body>
+<body class="locked">
 
+<div id="login" hidden>
+  <div class="hz"></div>
+  <form class="in" id="loginForm" autocomplete="on" novalidate>
+    <img src="icon-192.png" alt="">
+    <h1 id="loginObra">RDO</h1>
+    <p class="sub">Relatório Diário de Obra. Entre com o usuário e a senha que o responsável pela obra cadastrou para você.</p>
+    <label>Usuário<input type="text" id="lgUser" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
+    <label>Senha<input type="password" id="lgPass" name="password" autocomplete="current-password" required></label>
+    <div class="err" id="lgErr" hidden></div>
+    <button type="submit" class="btn pri" id="lgBtn">Entrar</button>
+    <p class="foot">Não tem acesso? Fale com o responsável pela obra.</p>
+  </form>
+</div>
 <header class="top">
   <div class="top-in">
     <div class="brand">
@@ -278,10 +304,15 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
     <div class="row"><button type="button" class="btn dark grow" id="gsSave">Salvar e testar</button></div>
     <div id="gsStatus" class="msg" hidden></div>
   </div>
+  <h2 class="sheet-h">Acesso</h2>
+  <div class="card" style="padding:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div class="grow" style="min-width:0"><div class="lbl">Conectado como</div><strong id="acNome">—</strong></div>
+    <button type="button" class="btn" id="acSair">Sair</button>
+  </div>
   <h2 class="sheet-h">Backup</h2>
   <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
   <div class="backup"><button type="button" class="btn" id="expBk">Exportar backup</button><label class="btn">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
-  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 8</p>
+  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 9</p>
 </main>
 
 <div class="bar" id="bar">
@@ -738,14 +769,53 @@ var GS_DEFAULT='https://script.google.com/macros/s/AKfycbwNjEGvhJYB1FAmDcQvhpafM
 function gsUrl(){ return (cfg.gsUrl&&/\/exec/.test(cfg.gsUrl))? cfg.gsUrl : GS_DEFAULT; }
 function gsQueue(){ return LS.get('gsfila')||[]; }
 function gsSetQueue(q){ LS.set('gsfila',q); }
+// ---------- login ----------
+function sessao(){ return LS.get('sessao'); }
+function lockApp(msg){ document.body.classList.add('locked'); $('#login').hidden=false; $('#loginObra').textContent=cfg.obra||'RDO';
+  var e=$('#lgErr'); e.hidden=!msg; e.textContent=msg||''; setTimeout(function(){ try{ $('#lgUser').focus(); }catch(x){} },50); }
+function unlockApp(){ document.body.classList.remove('locked'); $('#login').hidden=true; $('#lgPass').value=''; }
+function forceLogout(msg){ LS.set('sessao',null); lockApp(msg||'Sua sessão terminou. Entre de novo.'); }
+function naoAutorizado(j){ if(j&&j.codigo==='nao_autorizado'){ forceLogout('Seu acesso expirou ou foi removido pelo responsável da obra. Entre de novo.'); return true; } return false; }
+async function doLogin(ev){
+  ev.preventDefault();
+  var u=$('#lgUser').value.trim(), p=$('#lgPass').value, btn=$('#lgBtn'), err=$('#lgErr');
+  if(!u||!p){ err.hidden=false; err.textContent='Digite usuário e senha.'; return; }
+  if(!navigator.onLine){ err.hidden=false; err.textContent='Sem internet. Para entrar pela primeira vez, conecte-se a uma rede.'; return; }
+  btn.disabled=true; btn.textContent='Entrando…'; err.hidden=true;
+  try{
+    var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'login',usuario:u,senha:p}),redirect:'follow'});
+    var j=await res.json();
+    if(!j.ok){ err.hidden=false; err.textContent=j.erro||'Usuário ou senha incorretos.'; return; }
+    if(!j.token){ err.hidden=false; err.textContent='A planilha ainda está com o código antigo. O responsável precisa atualizar o script (versão com login) e publicar a nova versão.'; return; }
+    LS.set('sessao',{token:j.token,usuario:j.usuario,nome:j.nome,desde:Date.now()});
+    unlockApp(); toast('Bem-vindo, '+j.nome+'!'); renderAll();
+    await gsQueuePending(); gsFlush();
+  }catch(e){ err.hidden=false; err.textContent='Não consegui falar com a planilha. Confira a internet e tente de novo.'; }
+  finally{ btn.disabled=false; btn.textContent='Entrar'; }
+}
+async function verificarSessao(){
+  var s=sessao(); if(!s||!navigator.onLine) return;
+  try{ var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'sessao',token:s.token}),redirect:'follow'});
+    var j=await res.json(); if(!naoAutorizado(j)&&j.ok&&j.nome&&j.nome!==s.nome){ s.nome=j.nome; LS.set('sessao',s); } }catch(e){}
+}
+async function sair(){
+  var s=sessao(); if(s){ try{ await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'sair',token:s.token}),redirect:'follow'}); }catch(e){} }
+  LS.set('sessao',null); lockApp('');
+}
+$('#loginForm').addEventListener('submit',doLogin);
+$('#acSair').addEventListener('click',sair);
+
 function gsMark(date){ var q=gsQueue(); if(q.indexOf(date)<0){ q.push(date); gsSetQueue(q); } clearTimeout(gsTimer); gsTimer=setTimeout(gsFlush,4000); }
 var gsTimer=null, gsBusy=false;
 async function gsPost(payload){
+  var s=sessao(); if(!s) throw new Error('faça login');
+  payload.token=s.token;
   var body=JSON.stringify(payload);
   try{
     var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body,redirect:'follow'});
-    var j=await res.json(); if(!j.ok) throw new Error(j.erro||'erro no script'); return true;
+    var j=await res.json(); if(naoAutorizado(j)) throw new Error('login'); if(!j.ok) throw new Error(j.erro||'erro no script'); return true;
   }catch(e){
+    if(e&&e.message==='login') throw e;
     if(e&&e.message&&e.message!=='Failed to fetch'&&!/Load failed|NetworkError|JSON|Unexpected/.test(e.message)) throw e;
     if(!navigator.onLine) throw new Error('sem internet');
     await fetch(gsUrl(),{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body}); return true;
@@ -755,7 +825,7 @@ async function gsPost(payload){
 async function gsQueuePending(){ try{ var list=await Store.list(), sent=LS.get('gsenviados')||{}, q=gsQueue();
   Object.keys(list).forEach(function(d){ var u=(list[d]&&list[d].updatedAt)||1; if(!(sent[d]>=u) && q.indexOf(d)<0) q.push(d); }); gsSetQueue(q); }catch(e){} }
 async function gsFlush(){
-  if(gsBusy) return; var q=gsQueue(); if(!q.length){ gsShow(); return; }
+  if(gsBusy||!sessao()) return; var q=gsQueue(); if(!q.length){ gsShow(); return; }
   if(!navigator.onLine){ gsShow(); return; }
   gsBusy=true;
   try{
@@ -798,7 +868,7 @@ async function gsSaveTest(){
 function ntMsg(t,err){ var m=$('#ntStatus'); m.hidden=!t; m.className='msg'+(err?' err':''); m.textContent=t||''; }
 function b64uToU8(s){ var p='='.repeat((4-s.length%4)%4), b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/')), u=new Uint8Array(b.length); for(var i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; }
 function ntSuportado(){ return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window); }
-async function gsCall(payload){ var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'}); return res.json(); }
+async function gsCall(payload){ var s=sessao(); payload.token=s&&s.token; var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'}); var j=await res.json(); naoAutorizado(j); return j; }
 async function ntAtivar(){
   var btn=$('#ntAtivar');
   if(!ntSuportado()){ ntMsg('Para receber lembretes, abra o RDO pelo ícone da tela inicial (não pelo Safari). No iPhone, precisa do iOS 16.4 ou mais novo.',true); return; }
@@ -907,7 +977,7 @@ $('#impBk').addEventListener('change',function(e){ importBackup(e.target.files[0
 
 // ---------- navigation ----------
 function showView(v){ ['dia','hist','obra'].forEach(function(x){ $('#view-'+x).hidden=x!==v; $('#tab-'+x).setAttribute('aria-selected',String(x===v)); });
-  $('#bar').hidden=v!=='dia'; $('#daybar').hidden=v!=='dia'; if(v==='hist') renderHist(); if(v==='obra'){ renderCfg(); renderCad(); $('#gsUrl').value=gsUrl(); ntRender(); }
+  $('#bar').hidden=v!=='dia'; $('#daybar').hidden=v!=='dia'; if(v==='hist') renderHist(); if(v==='obra'){ renderCfg(); renderCad(); $('#gsUrl').value=gsUrl(); ntRender(); var ss=sessao(); $('#acNome').textContent= ss? (ss.nome+' ('+ss.usuario+')') : '—'; }
   if(v==='hist') gsShow(); window.scrollTo(0,0); }
 $$('.tabs button').forEach(function(b){ b.addEventListener('click',function(){ showView(b.dataset.view); }); });
 async function loadDay(date){ if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; await doSave(); } rdo=normRdo(await Store.getRdo(date),date); $('#aiText').value=''; aiMsg(''); renderAll(); setSync('salvo no celular'); }
@@ -922,7 +992,7 @@ $('#genBtn').addEventListener('click',function(){ if(saveTimer){ clearTimeout(sa
 document.addEventListener('visibilitychange',function(){ if(document.hidden&&saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); } });
 
 // ---------- boot ----------
-var APP_VERSION=8;
+var APP_VERSION=9;
 if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{ r.update(); }catch(e){} }).catch(function(){}); }); }
 async function forceUpdate(){
   var b=$('#updBtn'); if(b){ b.disabled=true; b.textContent='Atualizando…'; }
@@ -941,6 +1011,7 @@ document.addEventListener('visibilitychange',function(){ if(!document.hidden) ch
 setTimeout(checkVersion,1500);
 try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 (async function boot(){
+  if(sessao()) unlockApp(); else lockApp('');
   var c=LS.get('config'); if(c) cfg=Object.assign(clone(DEFAULT_CFG),c);
   rdo=normRdo(LS.get('d:'+todayISO()),todayISO()); renderAll(); setSync('conectando…');
   var cl=window.claude;
@@ -952,8 +1023,7 @@ try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(
   var rc=await Store.getConfig(); if(rc) cfg=Object.assign(clone(DEFAULT_CFG),rc);
   rdo=normRdo(await Store.getRdo(rdo.data),rdo.data);
   renderAll(); setSync('salvo no celular');
-  await gsQueuePending();
-  gsFlush();
+  if(!sessao()) lockApp(''); else { verificarSessao(); await gsQueuePending(); gsFlush(); }
 })();
 })();
 </script>

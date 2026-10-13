@@ -10,10 +10,15 @@
  * LEMBRETES (notificações às 10h e 19h): depois de colar o código, escolha a função
  * "instalarLembretes" na barra de cima, clique em Executar e autorize.
  * Depois: Implantar > Gerenciar implantações > lápis > Versão: Nova versão > Implantar.
+ *
+ * USUÁRIOS: na aba "Usuarios" da planilha, cadastre uma linha por pessoa:
+ *   Usuario | Senha | Nome | Ativo (Sim/Não)
+ * A senha digitada é trocada automaticamente por uma versão embaralhada (hash) no primeiro login.
+ * Para tirar o acesso de alguém, mude "Ativo" para Não. Sem login, o app não envia nada.
  */
 
 var ABAS = {
-  Dias:         ['Obra', 'Data', 'RDO_N', 'Dia_semana', 'Efetivo_total', 'Equipamentos_total', 'Chuva_mm', 'Horas_paradas', 'Servicos_com_producao', 'Dia_paralisado', 'Atualizado_em'],
+  Dias:         ['Obra', 'Data', 'RDO_N', 'Dia_semana', 'Efetivo_total', 'Equipamentos_total', 'Chuva_mm', 'Horas_paradas', 'Servicos_com_producao', 'Dia_paralisado', 'Atualizado_em', 'Preenchido_por'],
   Producao:     ['Obra', 'Data', 'Empresa', 'Servico', 'Unidade', 'Producao'],
   Efetivo:      ['Obra', 'Data', 'Empresa', 'Funcao', 'Quantidade'],
   Equipamentos: ['Obra', 'Data', 'Equipamento', 'Quantidade', 'Frente_obs'],
@@ -24,7 +29,8 @@ function doGet(e) {
   if (e && e.parameter && e.parameter.acao === 'vapid') return json_({ ok: true, vapid: chaves_().pub });
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   Object.keys(ABAS).forEach(function (nome) { aba_(ss, nome); });
-  return json_({ ok: true, planilha: ss.getName() });
+  abaUsuarios_(ss);
+  return json_({ ok: true, planilha: ss.getName(), login: true });
 }
 
 function doPost(e) {
@@ -32,7 +38,12 @@ function doPost(e) {
   lock.waitLock(30000);
   try {
     var body = JSON.parse(e.postData.contents);
-    if (body.acao === 'assinar') return json_(assinar_(body));
+    if (body.acao === 'login') return json_(login_(body));
+    var quem = sessao_(body.token);
+    if (!quem) return json_({ ok: false, codigo: 'nao_autorizado', erro: 'Faça login novamente.' });
+    if (body.acao === 'sessao') return json_({ ok: true, usuario: quem.usuario, nome: quem.nome });
+    if (body.acao === 'sair') { PropertiesService.getScriptProperties().deleteProperty('S_' + body.token); return json_({ ok: true }); }
+    if (body.acao === 'assinar') return json_(assinar_(body, quem));
     if (body.acao === 'testar') return json_({ ok: true, enviados: enviarLembrete_() });
     var dias = body.dias || [];
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -41,7 +52,7 @@ function doPost(e) {
       dias.forEach(function (d) {
         (d.tabelas[nome] || []).forEach(function (linha) {
           var l = [d.obra, data_(d.data)].concat(linha);
-          if (nome === 'Dias') l[ABAS.Dias.length - 1] = new Date(Number(l[ABAS.Dias.length - 1]) || Date.now());
+          if (nome === 'Dias') { var iA = ABAS.Dias.indexOf('Atualizado_em'); l[iA] = new Date(Number(l[iA]) || Date.now()); l[iA + 1] = quem.nome || quem.usuario; }
           novos.push(l);
         });
       });
@@ -59,7 +70,7 @@ function aba_(ss, nome) {
   var sh = ss.getSheetByName(nome);
   var cab = ABAS[nome];
   if (!sh) sh = ss.insertSheet(nome);
-  if (sh.getLastRow() === 0) {
+  if (sh.getLastRow() === 0 || sh.getRange(1, cab.length).getValue() !== cab[cab.length - 1]) {
     sh.getRange(1, 1, 1, cab.length).setValues([cab]).setFontWeight('bold');
     sh.setFrozenRows(1);
   }
@@ -88,7 +99,7 @@ function regravar_(ss, nome, dias, novos) {
   if (todas.length) {
     sh.getRange(2, 1, todas.length, n).setValues(todas);
     sh.getRange(2, 2, todas.length, 1).setNumberFormat('dd/mm/yyyy');
-    if (nome === 'Dias') sh.getRange(2, n, todas.length, 1).setNumberFormat('dd/mm/yyyy hh:mm');
+    if (nome === 'Dias') sh.getRange(2, ABAS.Dias.indexOf('Atualizado_em') + 1, todas.length, 1).setNumberFormat('dd/mm/yyyy hh:mm');
   }
 }
 
@@ -99,6 +110,82 @@ function iso_(v) {
 }
 function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 
+
+// ===================== USUÁRIOS E LOGIN =====================
+var CAB_USUARIOS = ['Usuario', 'Senha', 'Nome', 'Ativo'];
+var DIAS_SESSAO = 90;
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('RDO')
+    .addItem('Proteger senhas agora', 'protegerSenhas')
+    .addItem('Desconectar todos os celulares', 'encerrarSessoes')
+    .addToUi();
+}
+
+function abaUsuarios_(ss) {
+  var sh = ss.getSheetByName('Usuarios');
+  if (!sh) {
+    sh = ss.insertSheet('Usuarios');
+    sh.getRange(1, 1, 1, 4).setValues([CAB_USUARIOS]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+    sh.getRange('E1').setValue('Cadastre uma pessoa por linha. Ativo = Sim ou Não. A senha vira um código embaralhado depois do primeiro login.');
+  }
+  return sh;
+}
+function usuarios_() {
+  var sh = abaUsuarios_(SpreadsheetApp.getActiveSpreadsheet()), n = sh.getLastRow();
+  if (n < 2) return [];
+  return sh.getRange(2, 1, n - 1, 4).getValues().map(function (l, i) {
+    var u = String(l[0]).trim();
+    return { linha: i + 2, usuario: u, chave: u.toLowerCase(), senha: String(l[1]), nome: String(l[2]).trim() || u,
+             ativo: /^(sim|s|yes|1|true|ativo)$/i.test(String(l[3]).trim()) };
+  }).filter(function (u) { return u.usuario; });
+}
+function hex_(bytes) { return bytes.map(function (b) { return ('0' + ((b < 0 ? b + 256 : b)).toString(16)).slice(-2); }).join(''); }
+function hashSenha_(senha, sal) { return 'sha256$' + sal + '$' + hex_(SHA256_(utf8_(sal + '|' + senha))); }
+function senhaConfere_(guardada, digitada) {
+  if (guardada.indexOf('sha256$') === 0) { var p = guardada.split('$'); return hashSenha_(digitada, p[1]) === guardada; }
+  return guardada !== '' && guardada === digitada;
+}
+function protegerSenhas() {
+  var sh = abaUsuarios_(SpreadsheetApp.getActiveSpreadsheet()), n = 0;
+  usuarios_().forEach(function (u) {
+    if (u.senha && u.senha.indexOf('sha256$') !== 0) { sh.getRange(u.linha, 2).setValue(hashSenha_(u.senha, Utilities.getUuid().slice(0, 8))); n++; }
+  });
+  try { SpreadsheetApp.getUi().alert(n + ' senha(s) protegida(s).'); } catch (e) {}
+}
+function encerrarSessoes() {
+  var p = PropertiesService.getScriptProperties(), all = p.getProperties(), n = 0;
+  Object.keys(all).forEach(function (k) { if (k.indexOf('S_') === 0) { p.deleteProperty(k); n++; } });
+  try { SpreadsheetApp.getUi().alert(n + ' celular(es) desconectado(s). Todos vão precisar entrar de novo.'); } catch (e) {}
+}
+function login_(body) {
+  var chave = String(body.usuario || '').trim().toLowerCase(), cache = CacheService.getScriptCache();
+  if (!chave || !body.senha) return { ok: false, erro: 'Digite usuário e senha.' };
+  var falhas = Number(cache.get('F_' + chave) || 0);
+  if (falhas >= 5) return { ok: false, erro: 'Muitas tentativas erradas. Espere 15 minutos e tente de novo.' };
+  var u = usuarios_().filter(function (x) { return x.chave === chave; })[0];
+  if (!u || !u.ativo || !senhaConfere_(u.senha, String(body.senha))) {
+    cache.put('F_' + chave, String(falhas + 1), 900);
+    return { ok: false, erro: 'Usuário ou senha incorretos.' };
+  }
+  cache.remove('F_' + chave);
+  if (u.senha.indexOf('sha256$') !== 0) // troca a senha digitada pela versão embaralhada
+    abaUsuarios_(SpreadsheetApp.getActiveSpreadsheet()).getRange(u.linha, 2).setValue(hashSenha_(String(body.senha), Utilities.getUuid().slice(0, 8)));
+  var token = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
+  PropertiesService.getScriptProperties().setProperty('S_' + token, JSON.stringify({ u: u.chave, exp: Date.now() + DIAS_SESSAO * 864e5 }));
+  return { ok: true, token: token, usuario: u.usuario, nome: u.nome };
+}
+function sessao_(token) {
+  if (!token || !/^[0-9a-f]{40,80}$/.test(String(token))) return null;
+  var p = PropertiesService.getScriptProperties(), raw = p.getProperty('S_' + token);
+  if (!raw) return null;
+  var s = JSON.parse(raw);
+  if (Date.now() > s.exp) { p.deleteProperty('S_' + token); return null; }
+  var u = usuarios_().filter(function (x) { return x.chave === s.u; })[0];
+  if (!u || !u.ativo) return null;
+  return u;
+}
 
 // ===================== LEMBRETES (Web Push) =====================
 var SUB_VAPID = 'https://yanmantovani17.github.io/rdo/';
@@ -119,18 +206,20 @@ function lembreteNoite() { enviarLembrete_(); }
 function assinaturas_() { return JSON.parse(PropertiesService.getScriptProperties().getProperty('ASSINATURAS') || '[]'); }
 function salvarAssinaturas_(l) { PropertiesService.getScriptProperties().setProperty('ASSINATURAS', JSON.stringify(l)); }
 
-function assinar_(body) {
+function assinar_(body, quem) {
   var a = body.assinatura || {};
   if (!a.endpoint || !/^https:\/\//.test(a.endpoint)) return { ok: false, erro: 'assinatura inválida' };
   var l = assinaturas_().filter(function (x) { return x.endpoint !== a.endpoint; });
-  l.push({ endpoint: a.endpoint, obra: body.obra || '', criado: new Date().toISOString() });
+  l.push({ endpoint: a.endpoint, obra: body.obra || '', usuario: quem ? quem.usuario : '', criado: new Date().toISOString() });
   salvarAssinaturas_(l.slice(-20));
   return { ok: true, total: l.length };
 }
 
 function enviarLembrete_() {
-  var k = chaves_(), l = assinaturas_(), manter = [], ok = 0;
+  var k = chaves_(), l = assinaturas_(), manter = [], ok = 0, ativos = {};
+  usuarios_().forEach(function (u) { if (u.ativo) ativos[u.chave] = true; });
   l.forEach(function (a) {
+    if (a.usuario && !ativos[String(a.usuario).toLowerCase()]) return; // usuário desativado: para de receber
     try {
       var r = UrlFetchApp.fetch(a.endpoint, {
         method: 'post', muteHttpExceptions: true,
