@@ -267,6 +267,7 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
   <h2 class="sheet-h">Backup</h2>
   <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
   <div class="backup"><button type="button" class="btn" id="expBk">Exportar backup</button><label class="btn">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
+  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 4</p>
 </main>
 
 <div class="bar" id="bar">
@@ -276,6 +277,10 @@ body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div id="updBar" hidden style="position:fixed;left:16px;right:16px;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:40;background:var(--signal);color:var(--signal-ink);border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)">
+  <span style="flex:1;font-weight:600">Nova versão do app disponível.</span>
+  <button type="button" class="btn dark" id="updBtn">Atualizar agora</button>
+</div>
 
 <script src="jszip.min.js"></script>
 <script src="template.js"></script>
@@ -843,7 +848,23 @@ $('#genBtn').addEventListener('click',function(){ if(saveTimer){ clearTimeout(sa
 document.addEventListener('visibilitychange',function(){ if(document.hidden&&saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); } });
 
 // ---------- boot ----------
-if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
+var APP_VERSION=4;
+if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{ r.update(); }catch(e){} }).catch(function(){}); }); }
+async function forceUpdate(){
+  var b=$('#updBtn'); if(b){ b.disabled=true; b.textContent='Atualizando…'; }
+  try{ if(window.caches){ var ks=await caches.keys(); await Promise.all(ks.map(function(k){ return caches.delete(k); })); } }catch(e){}
+  try{ if(navigator.serviceWorker){ var rs=await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(function(r){ return r.unregister(); })); } }catch(e){}
+  location.replace(location.pathname+'?v='+Date.now());
+}
+async function checkVersion(){
+  try{ var res=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); var j=await res.json();
+    if(j&&+j.v>APP_VERSION){ $('#updBar').hidden=false; }
+    $('#appVer').textContent='Versão do app: '+APP_VERSION+(+j.v>APP_VERSION?' (disponível: '+j.v+')':' · atualizada');
+  }catch(e){}
+}
+document.addEventListener('click',function(e){ if(e.target.id==='updBtn') forceUpdate(); });
+document.addEventListener('visibilitychange',function(){ if(!document.hidden) checkVersion(); });
+setTimeout(checkVersion,1500);
 try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 (async function boot(){
   var c=LS.get('config'); if(c) cfg=Object.assign(clone(DEFAULT_CFG),c);
