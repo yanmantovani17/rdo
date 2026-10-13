@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = 4;   // troque junto com version.json a cada publicação
+var APP_VER = 5;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -46,7 +46,7 @@ function modeloById(id){ return MODELOS.find(function(m){ return m.id===id; }); 
 function saveCfg(){ LS.set('cfg',cfg); setTitle(); }
 function setTitle(){ document.title=(cfg.obra||'').trim()||'FVS'; }
 // script próprio do FVS (projeto separado do RDO), instalado na planilha MATRIZ_CAJAMAR_FVS
-var GS_DEFAULT='';
+var GS_DEFAULT='https://script.google.com/macros/s/AKfycbwmmrSChlMa8gLbP2b2x7ik0tagjkESJSngtUWee4NZC7gcsMxg0s2bRsCq7HJs9pD4/exec';   // MATRIZ_CAJAMAR_FVS
 function gsUrl(){ return (cfg.gsUrl&&/\/exec/.test(cfg.gsUrl))? cfg.gsUrl : GS_DEFAULT; }
 var URL_RE=/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/;
 
@@ -503,9 +503,11 @@ function naoAutorizado(j){ if(j&&j.codigo==='nao_autorizado'){ forceLogout('Seu 
 async function doLogin(ev){
   ev.preventDefault();
   var u=$('#lgUser').value.trim(), p=$('#lgPass').value, btn=$('#lgBtn'), err=$('#lgErr');
-  if(!gsUrl()){ var nu=$('#lgUrl').value.trim();
-    if(!URL_RE.test(nu)){ err.hidden=false; err.textContent='Cole o endereço do script da planilha de FVS. Ele começa com https://script.google.com/macros/s/ e termina com /exec.'; return; }
-    cfg.gsUrl=nu; saveCfg(); }
+  var boxOn=!$('#lgUrlBox').hidden;
+  if(!gsUrl()||boxOn){ var nu=$('#lgUrl').value.trim();
+    if(boxOn && gsUrl() && (!nu || nu===gsUrl())){ /* mantém o endereço atual */ }
+    else if(!URL_RE.test(nu)){ err.hidden=false; err.textContent='Cole o endereço do script da planilha de FVS. Ele começa com https://script.google.com/macros/s/ e termina com /exec.'; return; }
+    else { cfg.gsUrl=nu; saveCfg(); } }
   if(!u||!p){ err.hidden=false; err.textContent='Digite usuário e senha.'; return; }
   btn.disabled=true; btn.textContent='Entrando…'; err.hidden=true;
   var s0=sessao();
@@ -526,7 +528,8 @@ async function doLogin(ev){
     await guardarCred(j.usuario,p); tentativasLocais=0;
     unlockApp(); toast('Bem-vindo, '+j.nome+'!'); showView('painel');
     gsQueuePending(); gsFlush();
-  }catch(e){ err.hidden=false; err.textContent='Não consegui falar com a planilha. Confira a internet e tente de novo.'; }
+  }catch(e){ err.hidden=false; err.textContent='Não consegui falar com a planilha. Confira a internet. Se a internet estiver boa, o endereço do script pode estar errado: cole abaixo o endereço /exec da implantação e tente de novo.';
+    $('#lgUrlBox').hidden=false; if(!$('#lgUrl').value) $('#lgUrl').value=gsUrl(); }
   finally{ btn.disabled=false; btn.textContent='Entrar'; }
 }
 async function verificarSessao(){
