@@ -7,6 +7,9 @@
  *
  * Cada envio regrava os dados daquela obra + data (não duplica se enviar de novo).
  *
+ * FVS: o app de FVS usa este mesmo script e o mesmo login. Adicione o arquivo FVS.gs
+ * (Arquivos > + > Script > nome FVS) com o código de google-sheets/FVS.gs.
+ *
  * LEMBRETES (notificações às 10h e 19h): depois de colar o código, escolha a função
  * "instalarLembretes" na barra de cima, clique em Executar e autorize.
  * Depois: Implantar > Gerenciar implantações > lápis > Versão: Nova versão > Implantar.
@@ -45,6 +48,7 @@ function doPost(e) {
     if (body.acao === 'sair') { PropertiesService.getScriptProperties().deleteProperty('S_' + body.token); return json_({ ok: true }); }
     if (body.acao === 'assinar') return json_(assinar_(body, quem));
     if (body.acao === 'testar') return json_({ ok: true, enviados: enviarLembrete_() });
+    if (body.acao === 'fvs') return json_(fvsReceber_(body, quem));   // app de FVS (arquivo FVS.gs)
     var dias = body.dias || [];
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     Object.keys(ABAS).forEach(function (nome) {

@@ -1,74 +1,75 @@
 /**
- * FVS -> Google Sheets
- * Cole este código em: Planilha > Extensões > Apps Script (apague o que estiver lá).
- * Depois: Implantar > Nova implantação > App da Web
- *   Executar como: Eu  |  Quem pode acessar: Qualquer pessoa
- * Copie o endereço que termina em /exec e cole no app de FVS (aba Obra > Google Sheets).
+ * FVS -> Google Sheets  (segundo arquivo do MESMO projeto do Apps Script do RDO)
  *
- * Abas:
- *   FVS         - uma linha por ficha (Nº, processo, local, status, % de aprovação)
+ * Como instalar (uma vez):
+ *   1. Abra a planilha do RDO (MATRIX_CAJAMAR_PRODUTIVIDADE) > Extensões > Apps Script.
+ *   2. Troque o conteúdo de Codigo.gs pela versão nova (ela tem a linha que chama as FVS).
+ *   3. Clique no "+" ao lado de Arquivos > Script, dê o nome FVS e cole este código.
+ *   4. Implantar > Gerenciar implantações > lápis > Versão: Nova versão > Implantar.
+ *
+ * O login, os usuários (aba Usuarios da planilha do RDO) e os lembretes são os mesmos do RDO.
+ * As fichas vão para a planilha de FVS abaixo, nas abas:
+ *   FVS         - uma linha por ficha (Nº, processo, local, status, % de aprovação, quem preencheu)
  *   Itens       - uma linha por item verificado (A / R / NA da 1ª e da 2ª verificação)
  *   Indicadores - % de aprovação por processo, por mês e os itens que mais reprovam (fórmulas)
  * Cada envio regrava a ficha inteira (não duplica se enviar de novo).
  */
 
-var ABAS = {
+var FVS_PLANILHA_ID = '14hWLYy6Vv9O0YLEloFozDz84UFKw9uO5WusLq63U_70';   // MATRIZ_CAJAMAR_FVS
+
+var FVS_ABAS = {
   FVS:   ['Obra', 'FVS_N', 'Codigo', 'Processo', 'Categoria', 'Local', 'Projetos', 'Data_inicio', 'Data_termino',
-          'Itens', 'Verificados', 'A', 'R', 'NA', 'Reparos_pendentes', 'Aprovacao_1a_verif', 'Status', 'Inspetor', 'Atualizado_em', 'Id'],
+          'Itens', 'Verificados', 'A', 'R', 'NA', 'Reparos_pendentes', 'Aprovacao_1a_verif', 'Status', 'Inspetor',
+          'Atualizado_em', 'Preenchido_por', 'Id'],
   Itens: ['Obra', 'FVS_N', 'Processo', 'Local', 'Mes', 'Secao', 'Item_N', 'Item', 'O_que_verificar',
           'Verif_1', 'Inspetor_1', 'Data_1', 'Verif_2', 'Inspetor_2', 'Data_2', 'Resultado_final', 'Observacao', 'Id']
 };
-var DATAS = { FVS: [8, 9, 19], Itens: [12, 15] };   // colunas (1 = A) que são datas
+var FVS_DATAS = { FVS: [8, 9, 19], Itens: [12, 15] };   // colunas (1 = A) que são datas
 
-function doGet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  Object.keys(ABAS).forEach(function (nome) { aba_(ss, nome); });
-  indicadores_(ss, true);
-  return json_({ ok: true, planilha: ss.getName() });
-}
-
-function doPost(e) {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(30000);
-  try {
-    var body = JSON.parse(e.postData.contents);
-    var fichas = body.fichas || [], remover = body.remover || [];
-    var ids = {};
-    fichas.forEach(function (f) { ids[f.id] = true; });
-    remover.forEach(function (id) { ids[id] = true; });
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var novosF = [], novosI = [];
-    fichas.forEach(function (f) {
-      novosF.push(datas_('FVS', f.fvs).concat([f.id]));
-      (f.itens || []).forEach(function (l) { novosI.push(datas_('Itens', l).concat([f.id])); });
-    });
-    regravar_(ss, 'FVS', ids, novosF);
-    regravar_(ss, 'Itens', ids, novosI);
-    indicadores_(ss, false);
-    return json_({ ok: true, fichas: fichas.length, removidas: remover.length });
-  } catch (err) {
-    return json_({ ok: false, erro: String(err) });
-  } finally {
-    lock.releaseLock();
+// chamado pelo doPost do Codigo.gs quando body.acao === 'fvs' (já com o login conferido)
+function fvsReceber_(body, quem) {
+  var ss = SpreadsheetApp.openById(FVS_PLANILHA_ID);
+  if (body.teste) {
+    Object.keys(FVS_ABAS).forEach(function (nome) { fvsAba_(ss, nome); });
+    fvsIndicadores_(ss, false);
+    return { ok: true, planilha: ss.getName() };
   }
+  var fichas = body.fichas || [], remover = body.remover || [], ids = {};
+  fichas.forEach(function (f) { ids[f.id] = true; });
+  remover.forEach(function (id) { ids[id] = true; });
+  var nome = (quem && (quem.nome || quem.usuario)) || '';
+  var novosF = [], novosI = [];
+  fichas.forEach(function (f) {
+    var l = fvsDatas_('FVS', f.fvs);
+    l[FVS_ABAS.FVS.indexOf('Preenchido_por')] = nome;
+    novosF.push(l.concat([f.id]));
+    (f.itens || []).forEach(function (it) { novosI.push(fvsDatas_('Itens', it).concat([f.id])); });
+  });
+  fvsRegravar_(ss, 'FVS', ids, novosF);
+  fvsRegravar_(ss, 'Itens', ids, novosI);
+  fvsIndicadores_(ss, false);
+  return { ok: true, fichas: fichas.length, removidas: remover.length };
 }
 
-function aba_(ss, nome) {
+// rode esta função uma vez no editor se quiser recriar a aba Indicadores do zero
+function fvsRefazerIndicadores() { fvsIndicadores_(SpreadsheetApp.openById(FVS_PLANILHA_ID), true); }
+
+function fvsAba_(ss, nome) {
   var sh = ss.getSheetByName(nome);
-  var cab = ABAS[nome];
+  var cab = FVS_ABAS[nome];
   if (!sh) sh = ss.insertSheet(nome);
-  if (sh.getLastRow() === 0) {
+  if (sh.getLastRow() === 0 || sh.getRange(1, cab.length).getValue() !== cab[cab.length - 1]) {
     sh.getRange(1, 1, 1, cab.length).setValues([cab]).setFontWeight('bold').setBackground('#26313b').setFontColor('#ffffff');
     sh.setFrozenRows(1);
   }
   return sh;
 }
 
-// converte as colunas de data (vêm como "aaaa-mm-dd" ou número) em datas da planilha
-function datas_(nome, linha) {
-  var cab = ABAS[nome], l = linha.slice(0, cab.length - 1);
+// as linhas chegam sem a última coluna (Id); datas vêm como "aaaa-mm-dd" ou número
+function fvsDatas_(nome, linha) {
+  var cab = FVS_ABAS[nome], l = linha.slice(0, cab.length - 1);
   while (l.length < cab.length - 1) l.push('');
-  DATAS[nome].forEach(function (c) {
+  FVS_DATAS[nome].forEach(function (c) {
     var v = l[c - 1];
     if (typeof v === 'number') l[c - 1] = new Date(v);
     else if (v && /^\d{4}-\d{2}-\d{2}$/.test(v)) { var p = v.split('-'); l[c - 1] = new Date(+p[0], +p[1] - 1, +p[2]); }
@@ -77,9 +78,9 @@ function datas_(nome, linha) {
 }
 
 // apaga as linhas das fichas enviadas (pela coluna Id) e grava as novas no lugar
-function regravar_(ss, nome, ids, novos) {
-  var sh = aba_(ss, nome);
-  var n = ABAS[nome].length;
+function fvsRegravar_(ss, nome, ids, novos) {
+  var sh = fvsAba_(ss, nome);
+  var n = FVS_ABAS[nome].length;
   var ultima = sh.getLastRow();
   var manter = [];
   if (ultima > 1) {
@@ -91,7 +92,7 @@ function regravar_(ss, nome, ids, novos) {
   if (todas.length) {
     if (nome === 'Itens') sh.getRange(2, 5, todas.length, 1).setNumberFormat('@');   // Mes como texto (2026-10)
     sh.getRange(2, 1, todas.length, n).setValues(todas);
-    DATAS[nome].forEach(function (c) {
+    FVS_DATAS[nome].forEach(function (c) {
       sh.getRange(2, c, todas.length, 1).setNumberFormat(c === 19 ? 'dd/mm/yyyy hh:mm' : 'dd/mm/yyyy');
     });
     if (nome === 'FVS') sh.getRange(2, 16, todas.length, 1).setNumberFormat('0%');
@@ -99,7 +100,7 @@ function regravar_(ss, nome, ids, novos) {
 }
 
 // aba de indicadores: só fórmulas, recalcula sozinha quando chegam fichas novas
-function indicadores_(ss, refazer) {
+function fvsIndicadores_(ss, refazer) {
   var sh = ss.getSheetByName('Indicadores');
   if (sh && !refazer) return;
   if (!sh) sh = ss.insertSheet('Indicadores', 0);
@@ -159,5 +160,3 @@ function indicadores_(ss, refazer) {
   sh.setConditionalFormatRules([regra, regra2]);
   sh.getRange('A3').setValue('Verde: 95% ou mais · Laranja: abaixo de 85%').setFontColor(amarelo).setFontWeight('bold');
 }
-
-function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }

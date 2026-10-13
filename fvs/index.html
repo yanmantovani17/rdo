@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<title>FVS Obra</title>
+<title>FVS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
@@ -197,20 +197,70 @@ textarea{resize:vertical;min-height:72px}
 .pendrow .it-h b{font-size:.95rem}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 @media (max-width:380px){ .seg3 button{min-width:50px} .ver .lbl{min-width:0;width:100%} }
+/* ---- mesmo padrão do RDO: login, botão Salvar, arrastar para apagar, confirmação, logo ---- */
+.brand h1{flex:1;min-width:0}
+.hdr-save{flex:none;background:var(--signal);color:var(--signal-ink);border:0;border-radius:8px;padding:8px 14px;min-height:38px;font-family:var(--f-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.95rem;cursor:pointer}
+.hdr-save.ok{background:var(--ok);color:#fff}
+.hdr-save:disabled{opacity:.7}
+@media (max-width:480px){ .brand .sync{display:none} .brand h1{font-size:1.05rem} }
+.swipe{position:relative;border-radius:var(--r);overflow:hidden;background:var(--warn)}
+.swipe .frow{position:relative;z-index:1;transition:transform .2s ease;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.swipe.drag .frow{transition:none}
+.swipe .del{position:absolute;top:0;bottom:0;width:104px;border:0;background:var(--warn);color:#fff;font-weight:700;font-size:1rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer}
+.swipe .del-l{left:0}.swipe .del-r{right:0}
+.swipe .del svg{width:22px;height:22px}
+.hint{font-size:.8rem;color:var(--muted)}
+.sent{font-size:.78rem;color:var(--muted)} .sent.wait{color:var(--warn)}
+#cfmBack{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;padding:16px}
+#cfmBox{width:100%;max-width:480px;background:var(--surface);color:var(--ink);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;margin-bottom:env(safe-area-inset-bottom,0px)}
+#cfmBox h3{margin:0;font-family:var(--f-display);font-size:1.25rem;letter-spacing:.04em;text-transform:uppercase}
+#cfmBox p{margin:0;color:var(--muted);font-size:.95rem}
+#cfmBox .btn.danger{background:var(--warn);border-color:var(--warn);color:#fff}
+body.locked > *:not(#login):not(script){display:none!important}
+#login{position:fixed;inset:0;z-index:60;background:var(--asphalt);color:var(--asphalt-ink);display:flex;flex-direction:column;overflow-y:auto}
+#login .hz{height:6px;background:repeating-linear-gradient(-45deg,var(--signal) 0 10px,var(--asphalt) 10px 20px);flex:none}
+#login .in{width:100%;max-width:420px;margin:auto;padding:calc(env(safe-area-inset-top,0px) + 32px) 24px calc(env(safe-area-inset-bottom,0px) + 32px);display:flex;flex-direction:column;gap:14px}
+#login img{width:84px;height:84px;border-radius:20px;align-self:flex-start}
+#login img.logo{width:auto;height:auto;max-width:240px;max-height:72px;border-radius:8px;background:#fff;padding:8px}
+.logo-box{border:1px dashed var(--line);border-radius:8px;background:#fff;min-height:84px;display:flex;align-items:center;justify-content:center;padding:10px;text-align:center;color:#555;font-size:.85rem}
+.logo-box img{max-width:100%;max-height:90px;display:block}
+#login h1{font-family:var(--f-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:1.7rem;margin:6px 0 0;line-height:1.1}
+#login .sub{opacity:.75;font-size:.95rem;margin:0}
+#login label{display:flex;flex-direction:column;gap:6px;font-size:.75rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;opacity:.9}
+#login input{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.22);color:var(--asphalt-ink);border-radius:8px;padding:12px;min-height:48px;font-size:1rem;text-transform:none;letter-spacing:0;color-scheme:dark}
+#login input:focus-visible{outline:3px solid var(--signal);outline-offset:1px}
+#login .btn{min-height:50px;font-size:1.05rem}
+#login .err{background:rgba(240,146,90,.18);border:1px solid rgba(240,146,90,.5);border-radius:8px;padding:10px 12px;font-size:.92rem}
+#login .foot{font-size:.82rem;opacity:.6;margin-top:6px}
 </style>
 </head>
-<body>
+<body class="locked">
+<div id="login" hidden>
+  <div class="hz"></div>
+  <form class="in" id="loginForm" autocomplete="on" novalidate>
+    <img src="icon-192.png" alt="" id="loginLogo">
+    <h1 id="loginObra">FVS</h1>
+    <p class="sub">Fichas de Verificação de Serviço. Entre com o mesmo usuário e senha do RDO, cadastrados pelo responsável da obra.</p>
+    <label>Usuário<input type="text" id="lgUser" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
+    <label>Senha<input type="password" id="lgPass" name="password" autocomplete="current-password" required></label>
+    <div class="err" id="lgErr" hidden></div>
+    <button type="submit" class="btn pri" id="lgBtn">Entrar</button>
+    <p class="foot">Não tem acesso? Fale com o responsável pela obra.</p>
+  </form>
+</div>
 <header class="top">
   <div class="top-in">
     <div class="brand" id="brandMain">
       <h1 id="obraName">FVS<small>Fichas de Verificação de Serviço</small></h1>
       <span class="sync" id="sync">carregando…</span>
+      <button type="button" class="hdr-save" data-save aria-label="Salvar">Salvar</button>
     </div>
     <div class="brand" id="brandSub" hidden>
       <div class="fhead">
         <button type="button" class="back" id="backBtn" aria-label="Voltar">‹</button>
         <div class="t"><b id="subTitle">—</b><span id="subMeta"></span></div>
         <span class="numtag" id="subNum" hidden></span>
+        <button type="button" class="hdr-save" data-save aria-label="Salvar">Salvar</button>
       </div>
     </div>
     <nav class="tabs" role="tablist" id="tabs">
@@ -276,10 +326,16 @@ textarea{resize:vertical;min-height:72px}
     <label class="field"><span class="lbl">Responsável Qualidade</span><input type="text" id="c-qual"></label>
     <label class="field"><span class="lbl">Responsável Engenharia</span><input type="text" id="c-eng"></label>
     <label class="field"><span class="lbl">Locais frequentes (um por linha)</span><textarea id="c-locais" rows="4" placeholder="Ex.: Eixo 1&#10;Bloco B - 2º pavimento"></textarea></label>
+    <div class="field"><span class="lbl">Logo da empresa (aparece no topo de todas as FVS em PDF)</span>
+      <div class="logo-box" id="logoBox"><img id="logoPrev" alt="Logo da empresa" hidden><span id="logoVazio">Sem logo próprio — o PDF usa o logo padrão da ficha (Libercon).</span></div>
+      <div class="row"><label class="btn dark grow">Escolher logo<input type="file" id="logoFile" accept="image/*" hidden></label><button type="button" class="btn ghost" id="logoDel" hidden>Remover</button></div>
+      <span class="note">Use PNG ou JPG, de preferência na horizontal. O app ajusta o tamanho sozinho.</span>
+    </div>
+    <p class="note">As alterações desta tela são salvas sozinhas enquanto você digita.</p>
     <button type="button" class="btn dark full" id="saveCfg">Salvar dados da obra</button>
   </div>
   <h2 class="sheet-h">Google Sheets</h2>
-  <p class="note">Endereço do script instalado na planilha (termina em <b>/exec</b>). Com ele configurado, cada FVS salva vai sozinha para as abas FVS, Itens e Indicadores, onde a planilha calcula a % de aprovação de cada processo. Sem internet, o app guarda e envia depois.</p>
+  <p class="note">Já vem ligado à planilha MATRIZ_CAJAMAR_FVS, pelo mesmo script e login do RDO. Só troque o endereço se mudar de planilha. Cada FVS salva vai sozinha para as abas FVS, Itens e Indicadores, onde a planilha calcula a % de aprovação de cada processo. Sem internet, o app guarda e envia depois.</p>
   <div class="card pad">
     <label class="field"><span class="lbl">Endereço do App da Web</span><input type="text" id="gsUrl" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></label>
     <button type="button" class="btn dark full" id="gsSave">Salvar e testar</button>
@@ -287,13 +343,25 @@ textarea{resize:vertical;min-height:72px}
     <p class="note" id="gsInfo"></p>
     <button type="button" class="btn full" id="gsSendAll">Enviar todas as FVS agora</button>
   </div>
+  <h2 class="sheet-h">Lembretes</h2>
+  <p class="note">Uma notificação por volta das 10h e das 19h, junto com a do RDO, avisando quantos reparos estão pendentes e quantas FVS estão em aberto.</p>
+  <div class="card pad">
+    <button type="button" class="btn pri full" id="ntAtivar">Ativar lembretes</button>
+    <button type="button" class="btn full" id="ntTestar" hidden>Mandar uma notificação de teste</button>
+    <div id="ntStatus" class="msg" hidden></div>
+  </div>
   <h2 class="sheet-h">Relatórios</h2>
   <p class="note">Planilha com todas as FVS (status, datas, reparos) e a lista de pendências, para controle e envio à Qualidade.</p>
   <button type="button" class="btn pri full" id="xlsBtn">Exportar controle em Excel</button>
   <h2 class="sheet-h">Backup</h2>
   <p class="note">As fichas, fotos e assinaturas ficam guardadas neste celular. Exporte um backup toda semana e guarde no Arquivos ou no e-mail. O backup leva as fotos junto.</p>
   <div class="row"><button type="button" class="btn grow" id="expBk">Exportar backup</button><label class="btn grow">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
-  <p class="note" id="verInfo"></p>
+  <h2 class="sheet-h">Acesso</h2>
+  <div class="card pad" style="flex-direction:row;align-items:center;flex-wrap:wrap">
+    <div class="grow" style="min-width:0"><div class="lbl">Conectado como</div><strong id="acNome">—</strong></div>
+    <button type="button" class="btn" id="acSair">Sair</button>
+  </div>
+  <p class="note" id="verInfo" style="text-align:center"></p>
 </main>
 
 <div class="bar" id="bar">
@@ -322,6 +390,15 @@ textarea{resize:vertical;min-height:72px}
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div id="cfmBack" hidden><div id="cfmBox" role="dialog" aria-modal="true" aria-labelledby="cfmTit">
+  <h3 id="cfmTit">Apagar FVS?</h3>
+  <p id="cfmTxt"></p>
+  <div class="row"><button type="button" class="btn grow" id="cfmNo">Cancelar</button><button type="button" class="btn danger grow" id="cfmYes">Apagar</button></div>
+</div></div>
+<div id="updBar" hidden style="position:fixed;left:16px;right:16px;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:40;background:var(--signal);color:var(--signal-ink);border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)">
+  <span style="flex:1;font-weight:600">Nova versão do app disponível.</span>
+  <button type="button" class="btn dark" id="updBtn">Atualizar agora</button>
+</div>
 
 <script src="modelos.js"></script>
 <script src="logo.js"></script>

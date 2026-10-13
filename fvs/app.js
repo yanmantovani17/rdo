@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = '2026.10.13-1';   // troque junto com version.json a cada publicação
+var APP_VER = 3;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -33,7 +33,7 @@ var DB=(function(){
   };
 })();
 
-var DEFAULT_CFG={obra:'GOLGI RODOANEL NORTE', unidade:'', insp:'', sigla:'', prod:'', qual:'', eng:'', locais:[], seq:0, gsUrl:''};
+var DEFAULT_CFG={obra:'', unidade:'', insp:'', sigla:'', prod:'', qual:'', eng:'', locais:[], seq:0, gsUrl:''};
 var cfg=Object.assign({},DEFAULT_CFG);
 var fichas=[];           // all records, in memory
 var cur=null;            // open ficha
@@ -43,12 +43,16 @@ var catSel='Todas';
 var novoModelo=null;
 var MODELOS=window.FVS_MODELOS||[];
 function modeloById(id){ return MODELOS.find(function(m){ return m.id===id; }); }
-function saveCfg(){ LS.set('cfg',cfg); }
+function saveCfg(){ LS.set('cfg',cfg); setTitle(); }
+function setTitle(){ document.title=(cfg.obra||'').trim()||'FVS'; }
+// mesmo script e login do RDO (planilha MATRIX_CAJAMAR_PRODUTIVIDADE); as FVS vão para a MATRIZ_CAJAMAR_FVS
+var GS_DEFAULT='https://script.google.com/macros/s/AKfycbwNjEGvhJYB1FAmDcQvhpafMJMt_M6qzU1W_Ef--FL_E4yFiuTMYKWJuvANdEZsxG_qzg/exec';
+function gsUrl(){ return (cfg.gsUrl&&/\/exec/.test(cfg.gsUrl))? cfg.gsUrl : GS_DEFAULT; }
 
 var saveTimers={};
 function touch(f){ f=f||cur; if(!f) return; f.atualizado=Date.now(); setSync('salvando…'); clearTimeout(saveTimers[f.id]);
   saveTimers[f.id]=setTimeout(function(){ delete saveTimers[f.id]; persist(f); },500); }
-function persist(f){ return DB.put(f).then(function(){ setSync('salvo no celular'); gsMark(f.id); }).catch(function(e){ console.error(e); setSync('erro ao salvar'); toast('Não consegui salvar. Libere espaço no celular.'); }); }
+function persist(f){ return DB.put(f).then(function(){ setSync('salvo no celular'); gsMark(f.id); ntStatus(); }).catch(function(e){ console.error(e); setSync('erro ao salvar'); toast('Não consegui salvar. Libere espaço no celular.'); }); }
 function flushAll(){ Object.keys(saveTimers).forEach(function(id){ clearTimeout(saveTimers[id]); delete saveTimers[id]; var f=fichas.find(function(x){return x.id===id;}); if(f) persist(f); }); }
 
 // ---------- model ----------
@@ -78,6 +82,7 @@ function autoTermino(f){ var s=stats(f); if(s.st==='ok' && !f.termino) f.termino
 
 // ---------- views ----------
 function showView(v, opts){
+  if(cfgFormDirty && v!=='obra') saveCfgFromForm(true);
   view=v; opts=opts||{};
   ['painel','novo','ficha','pend','obra'].forEach(function(x){ $('#view-'+x).hidden=x!==v; });
   var main=(v==='painel'||v==='pend'||v==='obra');
@@ -111,15 +116,39 @@ function renderFList(){
   var el=$('#flist');
   if(!fichas.length){ el.innerHTML='<div class="empty"><b>Nenhuma FVS ainda</b>Toque em “+ Nova FVS”, escolha o serviço e o local. As 67 fichas da Libercon já estão no app.</div>'; return; }
   if(!list.length){ el.innerHTML='<div class="empty"><b>Nada encontrado</b>Mude a busca ou o filtro.</div>'; return; }
-  el.innerHTML=list.map(function(f){ var s=stats(f); var pct=s.t?Math.round(100*s.feitos/s.t):0;
+  var LIX='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>';
+  var temAberta=list.some(function(f){ return stats(f).st!=='ok'; });
+  el.innerHTML=(temAberta?'<div class="hint">Arraste uma FVS em andamento para o lado para apagar.</div>':'')+list.map(function(f){ var s=stats(f); var pct=s.t?Math.round(100*s.feitos/s.t):0;
     var meta=[s.feitos+'/'+s.t+' itens', s.pend? s.pend+' a reparar':'', 'início '+brShort(f.inicio), s.ass? s.ass+'/3 assinaturas':''].filter(Boolean).join(' · ');
-    return '<button type="button" class="frow '+s.st+'" data-id="'+f.id+'"><span class="n">Nº'+String(f.n).padStart(3,'0')+'</span><span class="grow">'+
+    var env=gsEnviada(f);
+    var row='<button type="button" class="frow '+s.st+'" data-id="'+f.id+'"><span class="n">Nº'+String(f.n).padStart(3,'0')+'</span><span class="grow">'+
       '<span class="tt">'+h(fCode(f))+' · '+h(f.titulo)+'</span><span class="loc">'+h(f.local||'—')+'</span>'+
-      '<span class="meta"><span class="badge '+s.st+'">'+ST_LBL[s.st]+'</span> '+h(meta)+'</span><span class="bar-mini"><i style="width:'+pct+'%"></i></span></span></button>'; }).join('');
+      '<span class="meta"><span class="badge '+s.st+'">'+ST_LBL[s.st]+'</span> '+h(meta)+'</span>'+
+      '<span class="sent'+(env?'':' wait')+'">'+(env?'Na planilha':'Aguardando envio para a planilha')+'</span><span class="bar-mini"><i style="width:'+pct+'%"></i></span></span></button>';
+    if(s.st==='ok') return row;
+    return '<div class="swipe"><button type="button" class="del del-l" data-del="'+f.id+'" tabindex="-1">'+LIX+'Apagar</button><button type="button" class="del del-r" data-del="'+f.id+'" tabindex="-1">'+LIX+'Apagar</button>'+row+'</div>'; }).join('');
+  ligarSwipe(el);
+}
+// ---------- arrastar para apagar (igual ao RDO) ----------
+function ligarSwipe(host){
+  $$('.swipe',host).forEach(function(sw){
+    var row=sw.querySelector('.frow'), x0=0, y0=0, dx=0, ativo=false, horiz=null, aberto=0, arrastou=false;
+    function pos(v){ row.style.transform= v? 'translateX('+v+'px)' : ''; }
+    function fechar(){ aberto=0; pos(0); }
+    row.addEventListener('pointerdown',function(e){ ativo=true; horiz=null; x0=e.clientX; y0=e.clientY; dx=0; });
+    row.addEventListener('pointermove',function(e){ if(!ativo) return; var mx=e.clientX-x0, my=e.clientY-y0;
+      if(horiz===null){ if(Math.abs(mx)<8&&Math.abs(my)<8) return; horiz=Math.abs(mx)>Math.abs(my); if(horiz){ sw.classList.add('drag'); try{ row.setPointerCapture(e.pointerId); }catch(x){} } }
+      if(!horiz) return; e.preventDefault(); dx=Math.max(-140,Math.min(140,aberto+mx)); pos(dx); });
+    function soltar(){ if(!ativo) return; ativo=false; sw.classList.remove('drag'); if(!horiz) return; arrastou=true; setTimeout(function(){ arrastou=false; },350);
+      if(dx>60){ aberto=104; pos(104); } else if(dx<-60){ aberto=-104; pos(-104); } else fechar();
+      $$('.swipe',host).forEach(function(o){ if(o!==sw){ o.querySelector('.frow').style.transform=''; } }); }
+    row.addEventListener('pointerup',soltar); row.addEventListener('pointercancel',soltar);
+    row.addEventListener('click',function(e){ if(arrastou){ e.stopPropagation(); e.preventDefault(); arrastou=false; return; } if(aberto){ e.stopPropagation(); e.preventDefault(); fechar(); } },true);
+  });
 }
 $('#tiles').addEventListener('click',function(e){ var b=e.target.closest('.tile'); if(!b) return; filtro=(filtro===b.dataset.f)?'':b.dataset.f; renderPainel(); });
 $('#q').addEventListener('input',renderFList);
-$('#flist').addEventListener('click',function(e){ var b=e.target.closest('.frow'); if(!b) return; openFicha(b.dataset.id); });
+$('#flist').addEventListener('click',function(e){ var d=e.target.closest('[data-del]'); if(d){ var f=fichas.find(function(x){ return x.id===d.dataset.del; }); if(f) deleteFicha(f); return; } var b=e.target.closest('.frow'); if(!b) return; openFicha(b.dataset.id); });
 
 function openFicha(id, itemIdx){ var f=fichas.find(function(x){return x.id===id;}); if(!f) return; cur=f; pushNav(); showView('ficha',{item:itemIdx}); }
 
@@ -329,12 +358,21 @@ $('#padOk').addEventListener('click',function(){
 async function loadSigs(){ var f=cur; for(var k of ['prod','qual','eng']){ var el=$('[data-sign="'+k+'"]'); if(!el) continue; var id=f.ass[k].sig; if(id){ var u=await blobURL(id); if(u){ el.style.backgroundImage='url("'+u+'")'; el.textContent=''; } } else { el.style.backgroundImage='none'; el.textContent='Toque para assinar'; } } }
 
 // ---------- delete ----------
-async function deleteFicha(f){
-  if(!confirm('Excluir a FVS Nº'+String(f.n).padStart(3,'0')+' ('+f.titulo+' – '+f.local+')? Isso não pode ser desfeito.')) return;
+var cfmAcao=null;
+function confirmar(tit, txt, sim, acao){ cfmAcao=acao; $('#cfmTit').textContent=tit; $('#cfmTxt').textContent=txt; $('#cfmYes').textContent=sim||'Apagar'; $('#cfmBack').hidden=false; $('#cfmNo').focus(); }
+function fecharConfirma(){ $('#cfmBack').hidden=true; cfmAcao=null; }
+$('#cfmNo').addEventListener('click',fecharConfirma);
+$('#cfmBack').addEventListener('click',function(e){ if(e.target.id==='cfmBack') fecharConfirma(); });
+$('#cfmYes').addEventListener('click',function(){ var a=cfmAcao; fecharConfirma(); if(a) a(); });
+function deleteFicha(f){
+  confirmar('Apagar a FVS Nº'+String(f.n).padStart(3,'0')+'?', f.titulo+' – '+f.local+'. Isso apaga as marcações, fotos e assinaturas dessa ficha e tira as linhas dela da planilha do Google. Não dá para desfazer.', 'Apagar', function(){ apagarFicha(f); });
+}
+async function apagarFicha(f){
   var keys=[]; f.fotos.forEach(function(p){ keys.push(p.id); }); f.itens.forEach(function(it){ it.fotos.forEach(function(p){ keys.push(p.id); }); }); ['prod','qual','eng'].forEach(function(k){ if(f.ass[k].sig) keys.push(f.ass[k].sig); });
   clearTimeout(saveTimers[f.id]); delete saveTimers[f.id];
   await DB.del(f.id); keys.forEach(function(k){ DB.delB(k).catch(function(){}); }); gsRemove(f.id);
-  fichas=fichas.filter(function(x){ return x!==f; }); cur=null; goHome(); toast('FVS excluída.');
+  fichas=fichas.filter(function(x){ return x!==f; }); var sent=LS.get('gsenviados')||{}; delete sent[f.id]; LS.set('gsenviados',sent);
+  if(cur===f){ cur=null; goHome(); } else renderPainel(); toast('FVS Nº'+String(f.n).padStart(3,'0')+' apagada.');
 }
 
 // ---------- pendências ----------
@@ -355,8 +393,8 @@ $('#plist').addEventListener('click',function(e){ var b=e.target.closest('.frow'
 function gsQueue(){ return LS.get('gsfila')||[]; }
 function gsRemQueue(){ return LS.get('gsrem')||[]; }
 var gsTimer=null, gsBusy=false;
-function gsMark(id){ if(!cfg.gsUrl) return; var q=gsQueue(); if(q.indexOf(id)<0){ q.push(id); LS.set('gsfila',q); } clearTimeout(gsTimer); gsTimer=setTimeout(gsFlush,4000); }
-function gsRemove(id){ LS.set('gsfila',gsQueue().filter(function(x){ return x!==id; })); if(!cfg.gsUrl) return; var r=gsRemQueue(); if(r.indexOf(id)<0){ r.push(id); LS.set('gsrem',r); } clearTimeout(gsTimer); gsTimer=setTimeout(gsFlush,1500); }
+function gsMark(id){ var q=gsQueue(); if(q.indexOf(id)<0){ q.push(id); LS.set('gsfila',q); } clearTimeout(gsTimer); gsTimer=setTimeout(gsFlush,4000); }
+function gsRemove(id){ LS.set('gsfila',gsQueue().filter(function(x){ return x!==id; })); var r=gsRemQueue(); if(r.indexOf(id)<0){ r.push(id); LS.set('gsrem',r); } clearTimeout(gsTimer); gsTimer=setTimeout(gsFlush,1500); }
 function resultadoFinal(it){ if(!it.v1) return 'Não verificado'; if(it.v1.c==='A') return 'Aprovado'; if(it.v1.c==='NA') return 'N/A';
   if(it.v2&&it.v2.c==='A') return 'Aprovado após reparo'; if(it.v2&&it.v2.c==='NA') return 'N/A'; return 'Reparo pendente'; }
 function gsFicha(f){
@@ -369,44 +407,52 @@ function gsFicha(f){
   return {id:f.id, fvs:[f.obra||cfg.obra||'', f.n, f.codigo, proc, f.cat||'', f.local, f.projetos||'', f.inicio||'', f.termino||'',
     s.t, s.feitos, A, R, N, s.pend, (A+R)? A/(A+R) : '', ST_LBL[s.st], insp.join(', ')||cfg.insp||'', f.atualizado||Date.now()], itens:itens};
 }
+function gsEnviada(f){ var sent=LS.get('gsenviados')||{}; return !!(sent[f.id] && sent[f.id]>=(f.atualizado||1)) && gsQueue().indexOf(f.id)<0; }
+// coloca na fila toda ficha que a planilha ainda não tem (nova, alterada ou restaurada de backup)
+function gsQueuePending(){ var sent=LS.get('gsenviados')||{}, q=gsQueue(); fichas.forEach(function(f){ if(!(sent[f.id]>=(f.atualizado||1)) && q.indexOf(f.id)<0) q.push(f.id); }); LS.set('gsfila',q); }
 async function gsPost(payload){
+  var s=sessao(); if(!s) throw new Error('faça login');
+  payload.acao='fvs'; payload.token=s.token;
   var body=JSON.stringify(payload);
   try{
-    var res=await fetch(cfg.gsUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body,redirect:'follow'});
-    var j=await res.json(); if(!j.ok) throw new Error(j.erro||'erro no script'); return true;
+    var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body,redirect:'follow'});
+    var j=await res.json(); if(naoAutorizado(j)) throw new Error('login'); if(!j.ok) throw new Error(codigoAntigo(j)? 'a planilha ainda está com o código antigo (falta o arquivo FVS no Apps Script)' : (j.erro||'erro no script')); return true;
   }catch(e){
+    if(e&&e.message==='login') throw e;
     if(e&&e.message&&!/Failed to fetch|Load failed|NetworkError|JSON|Unexpected/.test(e.message)) throw e;
     if(!navigator.onLine) throw new Error('sem internet');
     // o Google às vezes bloqueia a leitura da resposta; envia sem ler a resposta
-    await fetch(cfg.gsUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body}); return true;
+    await fetch(gsUrl(),{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body}); return true;
   }
 }
+function codigoAntigo(j){ return j && /fvsReceber_|is not defined|não está definid/i.test(String(j.erro||'')); }
 async function gsFlush(){
-  if(gsBusy||!cfg.gsUrl) return; var q=gsQueue(), rem=gsRemQueue(); if(!q.length&&!rem.length){ gsShow(); return; }
+  if(gsBusy||!sessao()) return; var q=gsQueue(), rem=gsRemQueue(); if(!q.length&&!rem.length){ gsShow(); return; }
   if(!navigator.onLine){ gsShow(); return; }
   gsBusy=true; gsShow();
   try{
     if(rem.length){ await gsPost({fichas:[],remover:rem}); LS.set('gsrem',gsRemQueue().filter(function(x){ return rem.indexOf(x)<0; })); }
     for(var i=0;i<q.length;i+=10){
       var part=q.slice(i,i+10), lote=[];
-      part.forEach(function(id){ var f=fichas.find(function(x){ return x.id===id; }); if(f) lote.push(gsFicha(f)); });
+      var stamp={};
+      part.forEach(function(id){ var f=fichas.find(function(x){ return x.id===id; }); if(f){ lote.push(gsFicha(f)); stamp[id]=f.atualizado||1; } });
       if(lote.length) await gsPost({fichas:lote});
+      var sent=LS.get('gsenviados')||{}; Object.keys(stamp).forEach(function(id){ sent[id]=stamp[id]; }); LS.set('gsenviados',sent);
       LS.set('gsfila',gsQueue().filter(function(x){ return part.indexOf(x)<0; }));
     }
     LS.set('gsultimo',Date.now()); LS.set('gserro',null);
   }catch(e){ LS.set('gserro',String(e&&e.message||e)); }
-  finally{ gsBusy=false; gsShow(); }
+  finally{ gsBusy=false; gsShow(); if(view==='painel' && !document.querySelector('.swipe.drag, .swipe .frow[style*="translate"]') && $('#cfmBack').hidden) renderFList(); }
 }
 function gsShow(){
   var el=$('#gsInfo'); if(!el) return; var q=gsQueue().length+gsRemQueue().length, last=LS.get('gsultimo'), err=LS.get('gserro'), t;
-  if(!cfg.gsUrl) t='Envio para o Google Sheets desligado.';
-  else if(gsBusy) t='Enviando para a planilha…';
+  if(gsBusy) t='Enviando para a planilha…';
   else if(q) t=q+' FVS aguardando envio'+(navigator.onLine?(err?' (último erro: '+err+')':'…'):' (sem internet; envia quando voltar).');
   else t='Planilha em dia'+(last?' · último envio '+new Date(last).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'')+'.';
-  el.textContent=t; $('#gsSendAll').hidden=!cfg.gsUrl;
+  el.textContent=t;
 }
+async function gsCall(payload){ var s=sessao(); payload.token=s&&s.token; var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),redirect:'follow'}); var j=await res.json(); naoAutorizado(j); return j; }
 async function gsSendAll(){
-  if(!cfg.gsUrl){ toast('Configure primeiro o endereço do Google Sheets.'); return; }
   if(!fichas.length){ toast('Ainda não há FVS salvas.'); return; }
   LS.set('gsfila',fichas.map(function(f){ return f.id; })); var btn=$('#gsSendAll'); btn.disabled=true; btn.textContent='Enviando '+fichas.length+' FVS…';
   await gsFlush(); btn.disabled=false; btn.textContent='Enviar todas as FVS agora';
@@ -415,32 +461,196 @@ async function gsSendAll(){
 async function gsSaveTest(){
   var url=$('#gsUrl').value.trim(), st=$('#gsStatus'); st.hidden=false; st.className='msg';
   if(url&&!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url)){ st.className='msg err'; st.textContent='Esse endereço não parece do Apps Script. Ele começa com https://script.google.com/macros/s/ e termina com /exec.'; return; }
-  var novo=url&&url!==cfg.gsUrl; cfg.gsUrl=url; saveCfg();
-  if(!url){ st.textContent='Envio para o Google Sheets desligado.'; gsShow(); return; }
+  var novo=url&&url!==gsUrl(); cfg.gsUrl=url||GS_DEFAULT; saveCfg(); $('#gsUrl').value=gsUrl();
   st.textContent='Testando a conexão…';
-  try{ var res=await fetch(url,{redirect:'follow'}); var j=await res.json(); if(!j.ok) throw 0;
-    st.textContent='Conectado à planilha "'+j.planilha+'". As abas FVS, Itens e Indicadores foram criadas.'+(fichas.length?' Enviando as FVS que já estão no celular…':'');
-  }catch(e){ st.className='msg err'; st.textContent='Salvei o endereço, mas não consegui confirmar a conexão. Confira se a implantação está como "Qualquer pessoa" e se você está com internet. Depois toque em "Enviar todas as FVS agora".'; gsShow(); return; }
-  if(novo && fichas.length){ LS.set('gsfila',fichas.map(function(f){ return f.id; })); await gsFlush();
-    st.textContent='Conectado à planilha "'+j.planilha+'". '+(gsQueue().length?'Algumas FVS não foram enviadas; toque em "Enviar todas as FVS agora".':fichas.length+' FVS enviadas. As próximas vão sozinhas.'); }
+  try{ var j=await gsCall({acao:'fvs',teste:true});
+    if(!j||!j.ok){ st.className='msg err'; st.textContent= j&&j.codigo==='nao_autorizado'? 'Sua sessão terminou. Entre de novo.' : (codigoAntigo(j)||!j? 'A planilha ainda está com o código antigo. No Apps Script do RDO, adicione o arquivo FVS, troque o Codigo.gs pela versão nova e publique uma nova versão.' : 'A planilha respondeu com erro: '+(j.erro||'desconhecido')); gsShow(); return; }
+    st.textContent='Conectado à planilha "'+j.planilha+'". As abas FVS, Itens e Indicadores estão prontas.';
+  }catch(e){ st.className='msg err'; st.textContent='Não consegui falar com a planilha. Confira a internet e tente de novo.'; gsShow(); return; }
+  if(novo && fichas.length){ LS.set('gsenviados',{}); gsQueuePending(); await gsFlush(); }
+  if(fichas.length) st.textContent+=' '+(gsQueue().length?'Algumas FVS ainda não foram enviadas.':'Todas as FVS deste celular estão na planilha.');
   gsShow();
 }
 $('#gsSave').addEventListener('click',gsSaveTest);
 $('#gsSendAll').addEventListener('click',gsSendAll);
 window.addEventListener('online',function(){ gsFlush(); });
+setInterval(function(){ gsQueuePending(); if(gsQueue().length||gsRemQueue().length) gsFlush(); },60000);
+document.addEventListener('visibilitychange',function(){ if(!document.hidden) gsFlush(); });
+
+// ---------- login (mesmo usuário e senha do RDO) ----------
+function sessao(){ return LS.get('sessao'); }
+var desbloqueado=false;
+function lockApp(msg){ desbloqueado=false; document.body.classList.add('locked'); $('#login').hidden=false; $('#loginObra').textContent=cfg.obra||'FVS'; renderLogo();
+  var s=sessao(); if(s&&!$('#lgUser').value) $('#lgUser').value=s.usuario||''; $('#lgPass').value='';
+  var e=$('#lgErr'); e.hidden=!msg; e.textContent=msg||'';
+  setTimeout(function(){ try{ ($('#lgUser').value? $('#lgPass') : $('#lgUser')).focus(); }catch(x){} },50); }
+function unlockApp(){ desbloqueado=true; document.body.classList.remove('locked'); $('#login').hidden=true; $('#lgPass').value='';
+  var s=sessao(); if(s && !cfg.insp){ cfg.insp=s.nome||s.usuario; saveCfg(); } }
+function forceLogout(msg){ LS.set('sessao',null); LS.set('cred',null); lockApp(msg||'Sua sessão terminou. Entre de novo.'); }
+// senha guardada só como código PBKDF2 (para conferir sem internet)
+function hexOf(buf){ return Array.prototype.map.call(new Uint8Array(buf),function(b){ return ('0'+b.toString(16)).slice(-2); }).join(''); }
+async function derivar(senha, sal){
+  var k=await crypto.subtle.importKey('raw',new TextEncoder().encode(senha),'PBKDF2',false,['deriveBits']);
+  return hexOf(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:new TextEncoder().encode(sal),iterations:150000},k,256));
+}
+async function guardarCred(usuario, senha){ try{ var sal=hexOf(crypto.getRandomValues(new Uint8Array(16))); LS.set('cred',{u:usuario.toLowerCase(),sal:sal,h:await derivar(senha,sal)}); }catch(e){} }
+async function confereLocal(usuario, senha){ var c=LS.get('cred'); if(!c||c.u!==usuario.toLowerCase()) return false; try{ return (await derivar(senha,c.sal))===c.h; }catch(e){ return false; } }
+var tentativasLocais=0;
+function naoAutorizado(j){ if(j&&j.codigo==='nao_autorizado'){ forceLogout('Seu acesso expirou ou foi removido pelo responsável da obra. Entre de novo.'); return true; } return false; }
+async function doLogin(ev){
+  ev.preventDefault();
+  var u=$('#lgUser').value.trim(), p=$('#lgPass').value, btn=$('#lgBtn'), err=$('#lgErr');
+  if(!u||!p){ err.hidden=false; err.textContent='Digite usuário e senha.'; return; }
+  btn.disabled=true; btn.textContent='Entrando…'; err.hidden=true;
+  var s0=sessao();
+  // já entrou antes neste celular: confere a senha aqui mesmo (funciona sem internet) e checa o acesso na planilha
+  if(s0 && LS.get('cred') && String(s0.usuario).toLowerCase()===u.toLowerCase()){
+    if(tentativasLocais>=5){ err.hidden=false; err.textContent='Muitas tentativas erradas. Feche o app e tente de novo mais tarde.'; btn.disabled=false; btn.textContent='Entrar'; return; }
+    if(await confereLocal(u,p)){ tentativasLocais=0; unlockApp(); toast('Bem-vindo, '+(s0.nome||u)+'!'); showView(view==='ficha'&&cur?'ficha':view,{keepScroll:true}); verificarSessao(); gsQueuePending(); gsFlush(); btn.disabled=false; btn.textContent='Entrar'; return; }
+    if(!navigator.onLine){ tentativasLocais++; err.hidden=false; err.textContent='Senha incorreta.'; btn.disabled=false; btn.textContent='Entrar'; return; }
+  }
+  if(!navigator.onLine){ err.hidden=false; err.textContent='Sem internet. Para entrar pela primeira vez neste celular, conecte-se a uma rede.'; btn.disabled=false; btn.textContent='Entrar'; return; }
+  try{
+    var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'login',usuario:u,senha:p}),redirect:'follow'});
+    var j=await res.json();
+    if(!j.ok){ err.hidden=false; err.textContent=j.erro||'Usuário ou senha incorretos.'; return; }
+    if(!j.token){ err.hidden=false; err.textContent='A planilha ainda está com o código antigo. O responsável precisa atualizar o script (versão com login) e publicar a nova versão.'; return; }
+    if(s0&&s0.token&&s0.token!==j.token){ try{ fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'sair',token:s0.token}),redirect:'follow'}); }catch(x){} }
+    LS.set('sessao',{token:j.token,usuario:j.usuario,nome:j.nome,desde:Date.now()});
+    await guardarCred(j.usuario,p); tentativasLocais=0;
+    unlockApp(); toast('Bem-vindo, '+j.nome+'!'); showView('painel');
+    gsQueuePending(); gsFlush();
+  }catch(e){ err.hidden=false; err.textContent='Não consegui falar com a planilha. Confira a internet e tente de novo.'; }
+  finally{ btn.disabled=false; btn.textContent='Entrar'; }
+}
+async function verificarSessao(){
+  var s=sessao(); if(!s||!navigator.onLine) return;
+  try{ var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'sessao',token:s.token}),redirect:'follow'});
+    var j=await res.json(); if(!naoAutorizado(j)&&j.ok&&j.nome&&j.nome!==s.nome){ s.nome=j.nome; LS.set('sessao',s); } }catch(e){}
+}
+async function sair(){
+  var s=sessao(); if(s){ try{ await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'sair',token:s.token}),redirect:'follow'}); }catch(e){} }
+  LS.set('sessao',null); LS.set('cred',null); $('#lgUser').value=''; lockApp('');
+}
+// pede a senha de novo se o app ficou mais de 5 minutos em segundo plano
+var saiuEm=0;
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden){ saiuEm=Date.now(); if(cfgFormDirty) saveCfgFromForm(true); return; }
+  if(desbloqueado && saiuEm && Date.now()-saiuEm>5*60*1000) lockApp('Por segurança, confirme sua senha para continuar.');
+});
+$('#loginForm').addEventListener('submit',doLogin);
+$('#acSair').addEventListener('click',sair);
+
+// ---------- lembretes (Web Push, enviados pelo script às 10h e 19h) ----------
+function ntMsg(t,err){ var m=$('#ntStatus'); m.hidden=!t; m.className='msg'+(err?' err':''); m.textContent=t||''; }
+function b64uToU8(x){ var p='='.repeat((4-x.length%4)%4), b=atob((x+p).replace(/-/g,'+').replace(/_/g,'/')), u=new Uint8Array(b.length); for(var i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; }
+function ntSuportado(){ return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window); }
+async function ntAtivar(){
+  var btn=$('#ntAtivar');
+  if(!ntSuportado()){ ntMsg('Para receber lembretes, abra o FVS pelo ícone da tela inicial (não pelo Safari). No iPhone, precisa do iOS 16.4 ou mais novo.',true); return; }
+  btn.disabled=true; btn.textContent='Ativando…';
+  try{
+    var perm=await Notification.requestPermission();
+    if(perm!=='granted'){ ntMsg('As notificações estão bloqueadas. Ative em Ajustes do iPhone → Notificações → FVS e tente de novo.',true); return; }
+    var reg=await navigator.serviceWorker.ready;
+    var sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      var v=await (await fetch(gsUrl()+'?acao=vapid',{redirect:'follow'})).json();
+      if(!v||!v.vapid){ ntMsg('A planilha ainda está com o código antigo. Troque o código no Apps Script, rode "instalarLembretes", publique a nova versão e toque em "Ativar lembretes" de novo.',true); return; }
+      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToU8(v.vapid)});
+    }
+    var r=await gsCall({acao:'assinar',assinatura:sub.toJSON(),obra:(cfg.obra||'')+' (FVS)'});
+    if(!r||!r.ok) throw new Error((r&&r.erro)||'A planilha não aceitou o cadastro.');
+    LS.set('lembretes',1); ntMsg('Lembretes ativados neste celular. Eles chegam por volta das 10h e das 19h.'); ntStatus();
+  }catch(e){ ntMsg('Não consegui ativar: '+(e&&e.message||e)+' Confira a internet e tente de novo.',true); }
+  finally{ btn.disabled=false; ntRender(); }
+}
+async function ntTestar(){
+  var b=$('#ntTestar'); b.disabled=true; b.textContent='Enviando…';
+  try{ var r=await gsCall({acao:'testar'}); ntMsg(r&&r.enviados? 'Notificação de teste enviada. Ela chega em alguns segundos (bloqueie a tela para ver).' : 'A planilha não encontrou celulares cadastrados. Toque em "Ativar lembretes" de novo.', !(r&&r.enviados)); }
+  catch(e){ ntMsg('Não consegui pedir o teste. Confira a internet.',true); }
+  b.disabled=false; b.textContent='Mandar uma notificação de teste';
+}
+async function ntRender(){
+  var on=false; try{ if(ntSuportado()&&Notification.permission==='granted'){ var reg=await navigator.serviceWorker.getRegistration(); on=!!(reg&&await reg.pushManager.getSubscription()); } }catch(e){}
+  $('#ntAtivar').textContent= on? 'Lembretes ativos ✓ (toque para recadastrar)' : 'Ativar lembretes';
+  $('#ntTestar').hidden=!on;
+}
+// conta reparos pendentes e FVS abertas para a mensagem da notificação
+function ntStatus(){
+  try{ if(!window.caches) return; var pend=0, abertas=0, hoje=0;
+    fichas.forEach(function(f){ var s=stats(f); pend+=s.pend; if(s.st!=='ok') abertas++; if(f.atualizado && new Date(f.atualizado).toDateString()===new Date().toDateString()) hoje++; });
+    caches.open('status-fvs').then(function(c){ c.put('status',new Response(JSON.stringify({pend:pend,abertas:abertas,hoje:hoje,dia:todayISO()}),{headers:{'Content-Type':'application/json'}})); });
+  }catch(e){}
+}
+$('#ntAtivar').addEventListener('click',ntAtivar);
+$('#ntTestar').addEventListener('click',ntTestar);
+
+// ---------- logo da empresa ----------
+function renderLogo(){
+  var tem=!!cfg.logo; $('#logoPrev').hidden=!tem; $('#logoVazio').hidden=tem; $('#logoDel').hidden=!tem;
+  if(tem) $('#logoPrev').src=cfg.logo; else $('#logoPrev').removeAttribute('src');
+  var ll=$('#loginLogo'); if(ll){ ll.src=cfg.logo||'icon-192.png'; ll.className=cfg.logo?'logo':''; }
+}
+// encaixa o logo numa faixa branca 4:1 (mesmo formato do RDO)
+function prepararLogo(file){
+  return new Promise(function(res,rej){
+    var url=URL.createObjectURL(file), img=new Image();
+    img.onload=function(){
+      var W=1200,H=300,pad=12, c=document.createElement('canvas'); c.width=W; c.height=H;
+      var x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+      var sc=Math.min((W-2*pad)/img.naturalWidth,(H-2*pad)/img.naturalHeight), w=img.naturalWidth*sc, hh=img.naturalHeight*sc;
+      x.imageSmoothingQuality='high'; x.drawImage(img,(W-w)/2,(H-hh)/2,w,hh); URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg',0.9));
+    };
+    img.onerror=function(){ URL.revokeObjectURL(url); rej(new Error('img')); };
+    img.src=url;
+  });
+}
+$('#logoFile').addEventListener('change',async function(e){
+  var f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f) return;
+  try{ cfg.logo=await prepararLogo(f); saveCfg(); renderLogo(); toast('Logo salvo. Ele vai aparecer em todas as FVS em PDF.'); }
+  catch(err){ toast('Não consegui ler essa imagem. Tente um PNG ou JPG.'); }
+});
+$('#logoDel').addEventListener('click',function(){ delete cfg.logo; saveCfg(); renderLogo(); toast('Logo removido. O PDF volta a usar o logo padrão da ficha.'); });
 
 function renderCfg(){
   $('#c-obra').value=cfg.obra||''; $('#c-unid').value=cfg.unidade||''; $('#c-insp').value=cfg.insp||''; $('#c-sigla').value=cfg.sigla||'';
   $('#c-prod').value=cfg.prod||''; $('#c-qual').value=cfg.qual||''; $('#c-eng').value=cfg.eng||''; $('#c-locais').value=(cfg.locais||[]).join('\n');
-  $('#gsUrl').value=cfg.gsUrl||''; gsShow();
-  $('#verInfo').textContent='Versão '+APP_VER+' · '+MODELOS.length+' modelos de FVS · '+fichas.length+' fichas salvas neste celular';
+  $('#gsUrl').value=gsUrl(); gsShow(); renderLogo(); ntRender();
+  var ss=sessao(); $('#acNome').textContent= ss? (ss.nome+' ('+ss.usuario+')') : '—';
+  verLine();
 }
-$('#saveCfg').addEventListener('click',function(){
+var cfgFormDirty=false, cfgTimer=null;
+function saveCfgFromForm(quiet){
   cfg.obra=$('#c-obra').value.trim(); cfg.unidade=$('#c-unid').value.trim(); cfg.insp=$('#c-insp').value.trim(); cfg.sigla=$('#c-sigla').value.trim().toUpperCase();
   cfg.prod=$('#c-prod').value.trim(); cfg.qual=$('#c-qual').value.trim(); cfg.eng=$('#c-eng').value.trim();
   cfg.locais=$('#c-locais').value.split('\n').map(function(s){return s.trim();}).filter(Boolean).slice(0,40);
-  saveCfg(); toast('Dados da obra salvos.');
+  saveCfg(); cfgFormDirty=false; clearTimeout(cfgTimer);
+  $('#obraName').innerHTML=h(cfg.obra||'FVS')+'<small>Fichas de Verificação de Serviço</small>';
+  if(!quiet) toast('Dados da obra salvos.');
+}
+$('#saveCfg').addEventListener('click',function(){ saveCfgFromForm(false); });
+// salva sozinho enquanto digita na aba Obra
+['#c-obra','#c-unid','#c-insp','#c-sigla','#c-prod','#c-qual','#c-eng','#c-locais'].forEach(function(sel){
+  ['input','change'].forEach(function(ev){ $(sel).addEventListener(ev,function(){ cfgFormDirty=true; setSync('alterações não salvas…'); clearTimeout(cfgTimer); cfgTimer=setTimeout(function(){ saveCfgFromForm(true); setSync('salvo no celular'); },800); }); });
 });
+// botão Salvar do cabeçalho: salva o que estiver na tela e manda para a planilha
+async function salvarTudo(b){
+  b.disabled=true;
+  try{
+    if(view==='obra' || cfgFormDirty) saveCfgFromForm(true);
+    if(cur){ clearTimeout(saveTimers[cur.id]); delete saveTimers[cur.id]; cur.atualizado=Date.now(); await persist(cur); }
+    flushAll();
+    if(navigator.onLine){ gsQueuePending(); await gsFlush(); }
+    b.textContent='Salvo ✓'; b.classList.add('ok');
+    var pendente=gsQueue().length;
+    toast(view==='obra'? 'Dados da obra salvos.' : (cur? 'FVS Nº'+String(cur.n).padStart(3,'0')+' salva'+(navigator.onLine&&!pendente?' e enviada para a planilha.':'. Vai para a planilha quando tiver internet.') : (navigator.onLine&&!pendente?'Tudo salvo e na planilha.':'Tudo salvo. Envia para a planilha quando tiver internet.')));
+    setTimeout(function(){ b.textContent='Salvar'; b.classList.remove('ok'); },1800);
+  }catch(e){ toast('Não consegui salvar. Tente de novo.'); }
+  finally{ b.disabled=false; }
+}
+$$('[data-save]').forEach(function(b){ b.addEventListener('click',function(){ salvarTudo(b); }); });
 
 // ---------- files ----------
 var ready={file:null,url:null};
@@ -517,6 +727,18 @@ $('#backBtn').addEventListener('click',function(){ if(view==='novo' && !$('#novo
 $$('.tabs button').forEach(function(b){ b.addEventListener('click',function(){ showView(b.dataset.view); }); });
 document.addEventListener('visibilitychange',function(){ if(document.hidden) flushAll(); else checkUpdate(); });
 
+// ---------- versão ----------
+var versaoNova=null;
+function verLine(){ var el=$('#verInfo'); if(!el) return; el.textContent='Versão do app: '+APP_VER+(versaoNova&&versaoNova!==APP_VER?' (disponível: '+versaoNova+')':' · atualizada')+' · '+MODELOS.length+' modelos de FVS · '+fichas.length+' fichas neste celular'; }
+// só mexe no cache e no service worker do FVS (o RDO tem os dele no mesmo endereço)
+async function forceUpdate(){
+  var b=$('#updBtn'); if(b){ b.disabled=true; b.textContent='Atualizando…'; } flushAll();
+  try{ if(window.caches){ var ks=await caches.keys(); await Promise.all(ks.filter(function(k){ return /^fvs-/.test(k); }).map(function(k){ return caches.delete(k); })); } }catch(e){}
+  try{ if(navigator.serviceWorker){ var rs=await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.filter(function(r){ return /\/fvs\/$/.test(r.scope); }).map(function(r){ return r.update(); })); } }catch(e){}
+  location.replace(location.pathname+'?v='+Date.now());
+}
+document.addEventListener('click',function(e){ if(e.target.id==='updBtn') forceUpdate(); });
+
 // ---------- atualização automática ----------
 // Toda vez que o app abre ou volta para a tela, confere se há versão nova publicada.
 // Se houver, salva tudo e recarrega sozinho, voltando para a mesma ficha.
@@ -526,8 +748,8 @@ async function checkUpdate(){
   try{
     if(swReg) swReg.update().catch(function(){});
     var r=await fetch('version.json?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return;
-    var v=(await r.json()).v; if(!v || v===APP_VER) return;
-    try{ if(sessionStorage.getItem('fvs:tried')===v) return; sessionStorage.setItem('fvs:tried', v); }catch(e){}   // evita recarregar em loop
+    var v=(await r.json()).v; versaoNova=v; verLine(); if(!v || String(v)===String(APP_VER)) return;
+    try{ if(sessionStorage.getItem('fvs:tried')===String(v)){ $('#updBar').hidden=false; return; } sessionStorage.setItem('fvs:tried', String(v)); }catch(e){}   // evita recarregar em loop; se não pegou, mostra a faixa
     updating=true; flushAll();
     try{ sessionStorage.setItem('fvs:reopen', JSON.stringify({id:cur&&cur.id, view:view})); sessionStorage.setItem('fvs:updated', v); }catch(e){}
     setSync('atualizando o app…');
@@ -543,16 +765,17 @@ try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(
   var c=LS.get('cfg'); if(c) cfg=Object.assign({},DEFAULT_CFG,c);
   try{ fichas=(await DB.all())||[]; }catch(e){ console.error(e); toast('Não consegui abrir os dados deste celular.'); }
   var maxN=fichas.reduce(function(a,f){ return Math.max(a,f.n||0); },0); if(maxN>(cfg.seq||0)){ cfg.seq=maxN; saveCfg(); }
-  setSync('salvo no celular');
+  setSync('salvo no celular'); setTitle();
   showView('painel');
+  lockApp(sessao()? 'Confirme sua senha para entrar.' : '');   // pede a senha sempre que o app abre
+  ntStatus();
   try{ var ro=JSON.parse(sessionStorage.getItem('fvs:reopen')||'null'); sessionStorage.removeItem('fvs:reopen');
     var upd=sessionStorage.getItem('fvs:updated'); sessionStorage.removeItem('fvs:updated');
     if(ro){ if(ro.view==='ficha' && ro.id && fichas.some(function(f){ return f.id===ro.id; })) openFicha(ro.id); else if(ro.view==='pend'||ro.view==='obra') showView(ro.view); }
     if(upd) setTimeout(function(){ toast('App atualizado para a versão nova.'); },400);
   }catch(e){}
   setTimeout(checkUpdate,1500);
-  setTimeout(gsFlush,2500);
-  if(!c){ setTimeout(function(){ toast('Primeiro acesso: preencha a aba Obra com os nomes dos responsáveis.'); },600); }
+  if(sessao()){ verificarSessao(); gsQueuePending(); setTimeout(gsFlush,2500); }
 })();
 window.__fvs={get fichas(){return fichas;}, get cur(){return cur;}, cfg:function(){return cfg;}};
 })();
