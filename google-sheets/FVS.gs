@@ -148,9 +148,18 @@ function fvsRegravar_(ss, nome, ids, novos) {
 }
 
 // aba de indicadores: só fórmulas, recalcula sozinha quando chegam fichas novas
+// planilha em português usa ";" entre os argumentos das fórmulas; em inglês, ","
+function fx_(ss, f) {
+  var loc = String(ss.getSpreadsheetLocale() || 'pt_BR');
+  if (/^en/i.test(loc)) return f;
+  var out = '', aspas = false;
+  for (var i = 0; i < f.length; i++) { var ch = f[i]; if (ch === '"') aspas = !aspas; out += (ch === ',' && !aspas) ? ';' : ch; }
+  return out;
+}
 function fvsIndicadores_(ss, refazer) {
   var sh = ss.getSheetByName('Indicadores');
-  if (sh && !refazer) return;
+  // já existe e as fórmulas estão no separador certo: não mexe
+  if (sh && !refazer && String(sh.getRange('D5').getFormula() || '').indexOf(fx_(ss, ',')) >= 0) return;
   if (!sh) sh = ss.insertSheet('Indicadores', 0);
   sh.clear();
   var esc = '#26313b', amarelo = '#e8a100';
@@ -162,39 +171,39 @@ function fvsIndicadores_(ss, refazer) {
   var cab = ['Processo', 'FVS', 'Itens avaliados (A+R)', 'A - aprovados de 1ª', 'R - reprovados', 'N/A', '% aprovação de 1ª', '% aprovação final', 'Reparos pendentes'];
   sh.getRange(4, 1, 1, cab.length).setValues([cab]).setFontWeight('bold').setBackground(esc).setFontColor('#ffffff').setWrap(true);
   sh.getRange('A5').setValue('TOTAL DA OBRA');
-  sh.getRange('B5').setFormula('=COUNTA(FVS!B2:B)');
-  sh.getRange('C5').setFormula('=D5+E5');
-  sh.getRange('D5').setFormula('=COUNTIF(Itens!J2:J,"A")');
-  sh.getRange('E5').setFormula('=COUNTIF(Itens!J2:J,"R")');
-  sh.getRange('F5').setFormula('=COUNTIF(Itens!J2:J,"NA")');
-  sh.getRange('G5').setFormula('=IF(C5=0,"",D5/C5)');
-  sh.getRange('H5').setFormula('=IF(C5=0,"",COUNTIF(Itens!P2:P,"Aprovado*")/C5)');
-  sh.getRange('I5').setFormula('=COUNTIF(Itens!P2:P,"Reparo pendente")');
+  sh.getRange('B5').setFormula(fx_(ss, '=COUNTA(FVS!B2:B)'));
+  sh.getRange('C5').setFormula(fx_(ss, '=D5+E5'));
+  sh.getRange('D5').setFormula(fx_(ss, '=COUNTIF(Itens!J2:J,"A")'));
+  sh.getRange('E5').setFormula(fx_(ss, '=COUNTIF(Itens!J2:J,"R")'));
+  sh.getRange('F5').setFormula(fx_(ss, '=COUNTIF(Itens!J2:J,"NA")'));
+  sh.getRange('G5').setFormula(fx_(ss, '=IF(C5=0,"",D5/C5)'));
+  sh.getRange('H5').setFormula(fx_(ss, '=IF(C5=0,"",COUNTIF(Itens!P2:P,"Aprovado*")/C5)'));
+  sh.getRange('I5').setFormula(fx_(ss, '=COUNTIF(Itens!P2:P,"Reparo pendente")'));
   sh.getRange('A5:I5').setFontWeight('bold').setBackground('#fff3d1');
-  sh.getRange('A6').setFormula('=IFERROR(SORT(UNIQUE(FILTER(Itens!C2:C,Itens!C2:C<>""))),"")');
-  sh.getRange('B6').setFormula('=ARRAYFORMULA(IF(A6:A="","",COUNTIF(FVS!D2:D,A6:A)))');
-  sh.getRange('C6').setFormula('=ARRAYFORMULA(IF(A6:A="","",D6:D+E6:E))');
-  sh.getRange('D6').setFormula('=ARRAYFORMULA(IF(A6:A="","",COUNTIFS(Itens!C2:C,A6:A,Itens!J2:J,"A")))');
-  sh.getRange('E6').setFormula('=ARRAYFORMULA(IF(A6:A="","",COUNTIFS(Itens!C2:C,A6:A,Itens!J2:J,"R")))');
-  sh.getRange('F6').setFormula('=ARRAYFORMULA(IF(A6:A="","",COUNTIFS(Itens!C2:C,A6:A,Itens!J2:J,"NA")))');
-  sh.getRange('G6').setFormula('=ARRAYFORMULA(IF(A6:A="","",IF(C6:C=0,"",D6:D/C6:C)))');
-  sh.getRange('H6').setFormula('=ARRAYFORMULA(IF(A6:A="","",IF(C6:C=0,"",COUNTIFS(Itens!C2:C,A6:A,Itens!P2:P,"Aprovado*")/C6:C)))');
-  sh.getRange('I6').setFormula('=ARRAYFORMULA(IF(A6:A="","",COUNTIFS(Itens!C2:C,A6:A,Itens!P2:P,"Reparo pendente")))');
+  sh.getRange('A6').setFormula(fx_(ss, '=IFERROR(SORT(UNIQUE(FILTER(Itens!C2:C,Itens!C2:C<>""))),"")'));
+  sh.getRange('B6').setFormula(fx_(ss, '=ARRAYFORMULA(IF(A6:A="","",COUNTIF(FVS!D2:D,A6:A)))'));
+  sh.getRange('C6').setFormula(fx_(ss, '=ARRAYFORMULA(IF(A6:A="","",D6:D+E6:E))'));
+  sh.getRange('D6').setFormula(fx_(ss, '=ARRAYFORMULA(IF(A6:A="","",COUNTIFS(Itens!C2:C,A6:A,Itens!J2:J,"A")))'));
+  sh.getRange('E6').setFormula(fx_(ss, '=ARRAYFORMULA(IF(A6:A="","",COUNTIFS(Itens!C2:C,A6:A,Itens!J2:J,"R")))'));
+  sh.getRange('F6').setFormula(fx_(ss, '=ARRAYFORMULA(IF(A6:A="","",COUNTIFS(Itens!C2:C,A6:A,Itens!J2:J,"NA")))'));
+  sh.getRange('G6').setFormula(fx_(ss, '=ARRAYFORMULA(IF(A6:A="","",IF(C6:C=0,"",D6:D/C6:C)))'));
+  sh.getRange('H6').setFormula(fx_(ss, '=ARRAYFORMULA(IF(A6:A="","",IF(C6:C=0,"",COUNTIFS(Itens!C2:C,A6:A,Itens!P2:P,"Aprovado*")/C6:C)))'));
+  sh.getRange('I6').setFormula(fx_(ss, '=ARRAYFORMULA(IF(A6:A="","",COUNTIFS(Itens!C2:C,A6:A,Itens!P2:P,"Reparo pendente")))'));
   sh.getRange('G5:H').setNumberFormat('0.0%');
 
   // bloco 2: por mês
   var cab2 = ['Mês', 'Itens avaliados (A+R)', 'A', 'R', '% aprovação de 1ª'];
   sh.getRange(4, 11, 1, cab2.length).setValues([cab2]).setFontWeight('bold').setBackground(esc).setFontColor('#ffffff').setWrap(true);
-  sh.getRange('K5').setFormula('=IFERROR(SORT(UNIQUE(FILTER(Itens!E2:E,Itens!E2:E<>""))),"")');
-  sh.getRange('L5').setFormula('=ARRAYFORMULA(IF(K5:K="","",M5:M+N5:N))');
-  sh.getRange('M5').setFormula('=ARRAYFORMULA(IF(K5:K="","",COUNTIFS(Itens!E2:E,K5:K,Itens!J2:J,"A")))');
-  sh.getRange('N5').setFormula('=ARRAYFORMULA(IF(K5:K="","",COUNTIFS(Itens!E2:E,K5:K,Itens!J2:J,"R")))');
-  sh.getRange('O5').setFormula('=ARRAYFORMULA(IF(K5:K="","",IF(L5:L=0,"",M5:M/L5:L)))');
+  sh.getRange('K5').setFormula(fx_(ss, '=IFERROR(SORT(UNIQUE(FILTER(Itens!E2:E,Itens!E2:E<>""))),"")'));
+  sh.getRange('L5').setFormula(fx_(ss, '=ARRAYFORMULA(IF(K5:K="","",M5:M+N5:N))'));
+  sh.getRange('M5').setFormula(fx_(ss, '=ARRAYFORMULA(IF(K5:K="","",COUNTIFS(Itens!E2:E,K5:K,Itens!J2:J,"A")))'));
+  sh.getRange('N5').setFormula(fx_(ss, '=ARRAYFORMULA(IF(K5:K="","",COUNTIFS(Itens!E2:E,K5:K,Itens!J2:J,"R")))'));
+  sh.getRange('O5').setFormula(fx_(ss, '=ARRAYFORMULA(IF(K5:K="","",IF(L5:L=0,"",M5:M/L5:L)))'));
   sh.getRange('O5:O').setNumberFormat('0.0%');
 
   // bloco 3: itens que mais reprovam
   sh.getRange('Q4:S4').setFontWeight('bold').setBackground(esc).setFontColor('#ffffff').setWrap(true);
-  sh.getRange('Q4').setFormula('=IFERROR(QUERY(Itens!A1:R,"select C, H, count(J) where J = \'R\' group by C, H order by count(J) desc limit 20 label C \'Processo\', H \'Item que mais reprova\', count(J) \'Reprovações (R na 1ª)\'",1),"Itens que mais reprovam: nenhuma reprovação ainda")');
+  sh.getRange('Q4').setFormula(fx_(ss, '=IFERROR(QUERY(Itens!A1:R,"select C, H, count(J) where J = \'R\' group by C, H order by count(J) desc limit 20 label C \'Processo\', H \'Item que mais reprova\', count(J) \'Reprovações (R na 1ª)\'",1),"Itens que mais reprovam: nenhuma reprovação ainda")'));
 
   sh.setFrozenRows(4);
   sh.setColumnWidth(1, 300); sh.setColumnWidths(2, 8, 105); sh.setColumnWidth(10, 24);
