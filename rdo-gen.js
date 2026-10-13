@@ -274,6 +274,10 @@
     var files = {};
     for (var i = 0; i < names.length; i++) files[names[i]] = await zip.file(names[i]).async('string');
     var info = fillSheets(files, cfg, rdo);
+    // logo da empresa: o logo fica numa imagem só (xl/media/image1.jpeg) usada em B2 de todas as abas
+    if (cfg.logo && /^data:image\/jpeg;base64,/.test(cfg.logo) && zip.file('xl/media/image1.jpeg')) {
+      zip.file('xl/media/image1.jpeg', b64ToBytes(cfg.logo.split(',')[1]));
+    }
     var ctypes = [];
     addPhotos(zip, files, rdo.fotos, ctypes);
     Object.keys(files).forEach(function (n) { zip.file(n, files[n]); });

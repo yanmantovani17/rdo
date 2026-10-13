@@ -194,6 +194,9 @@ body.locked > *:not(#login):not(script){display:none!important}
 #login .hz{height:6px;background:repeating-linear-gradient(-45deg,var(--signal) 0 10px,var(--asphalt) 10px 20px);flex:none}
 #login .in{width:100%;max-width:420px;margin:auto;padding:calc(env(safe-area-inset-top,0px) + 32px) 24px calc(env(safe-area-inset-bottom,0px) + 32px);display:flex;flex-direction:column;gap:14px}
 #login img{width:84px;height:84px;border-radius:20px;align-self:flex-start}
+#login img.logo{width:auto;height:auto;max-width:240px;max-height:72px;border-radius:8px;background:#fff;padding:8px}
+.logo-box{border:1px dashed var(--line);border-radius:8px;background:#fff;min-height:84px;display:flex;align-items:center;justify-content:center;padding:10px;text-align:center;color:#555;font-size:.85rem}
+.logo-box img{max-width:100%;max-height:90px;display:block}
 #login h1{font-family:var(--f-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:1.7rem;margin:6px 0 0;line-height:1.1}
 #login .sub{opacity:.75;font-size:.95rem;margin:0}
 #login label{display:flex;flex-direction:column;gap:6px;font-size:.75rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;opacity:.9}
@@ -220,7 +223,7 @@ body.locked > *:not(#login):not(script){display:none!important}
 <div id="login" hidden>
   <div class="hz"></div>
   <form class="in" id="loginForm" autocomplete="on" novalidate>
-    <img src="icon-192.png" alt="">
+    <img src="icon-192.png" alt="" id="loginLogo">
     <h1 id="loginObra">RDO</h1>
     <p class="sub">Relatório Diário de Obra. Entre com o usuário e a senha que o responsável pela obra cadastrou para você.</p>
     <label>Usuário<input type="text" id="lgUser" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
@@ -285,6 +288,14 @@ body.locked > *:not(#login):not(script){display:none!important}
   <p class="note">Essas informações se repetem em todo RDO. Ajuste uma vez e o app usa todos os dias.</p>
   <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:12px">
     <label class="field"><span class="lbl">Nome da obra</span><input type="text" id="c-obra"></label>
+    <div class="field"><span class="lbl">Logo da empresa (aparece no topo de todas as páginas do RDO)</span>
+      <div class="logo-box" id="logoBox"><img id="logoPrev" alt="Logo da empresa" hidden><span id="logoVazio">Sem logo próprio — o RDO usa o logo padrão da planilha.</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <label class="btn dark" style="flex:1">Escolher logo<input type="file" id="logoFile" accept="image/*" hidden></label>
+        <button type="button" class="btn ghost" id="logoDel" hidden>Remover</button>
+      </div>
+      <span class="note" style="margin:0">Use PNG ou JPG, de preferência na horizontal. O app ajusta o tamanho sozinho.</span>
+    </div>
     <div class="grid2">
       <label class="field"><span class="lbl">Início do contrato</span><input type="date" id="c-inicio"></label>
       <label class="field"><span class="lbl">Término</span><input type="date" id="c-termino"></label>
@@ -330,7 +341,7 @@ body.locked > *:not(#login):not(script){display:none!important}
   <h2 class="sheet-h">Backup</h2>
   <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
   <div class="backup"><button type="button" class="btn" id="expBk">Exportar backup</button><label class="btn">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
-  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 12</p>
+  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 13</p>
 </main>
 
 <div class="bar" id="bar">
@@ -795,7 +806,7 @@ function gsSetQueue(q){ LS.set('gsfila',q); }
 // ---------- login ----------
 function sessao(){ return LS.get('sessao'); }
 var desbloqueado=false;
-function lockApp(msg){ desbloqueado=false; document.body.classList.add('locked'); $('#login').hidden=false; $('#loginObra').textContent=cfg.obra||'RDO';
+function lockApp(msg){ desbloqueado=false; document.body.classList.add('locked'); $('#login').hidden=false; $('#loginObra').textContent=cfg.obra||'RDO'; try{ renderLogo(); }catch(e){}
   var s=sessao(), c=LS.get('cred'); if(s&&!$('#lgUser').value) $('#lgUser').value=s.usuario||''; $('#lgPass').value='';
   var e=$('#lgErr'); e.hidden=!msg; e.textContent=msg||''; e.style.background=''; 
   setTimeout(function(){ try{ ($('#lgUser').value? $('#lgPass') : $('#lgUser')).focus(); }catch(x){} },50); }
@@ -1026,12 +1037,39 @@ $('#histList').addEventListener('click',async function(e){ var x=e.target.closes
 
 // ---------- config ----------
 function renderCfg(){
+  renderLogo();
   $('#c-obra').value=cfg.obra||''; $('#c-inicio').value=cfg.inicio||''; $('#c-termino').value=cfg.termino||'';
   $('#c-empresas').value=(cfg.empresas||[]).join('\n'); $('#c-equip').value=(cfg.equipamentos||[]).join('\n'); $('#c-fextra').value=(cfg.funcoesExtras||[]).join('\n');
   ['elab','receb'].forEach(function(k){ var arr=cfg[k==='elab'?'elaboracao':'recebimento']||[]; var html='';
     for(var i=0;i<4;i++){ var p=arr[i]||{}; html+='<input type="text" id="c-'+k+'-n'+i+'" placeholder="Nome" value="'+h(p.nome||'')+'"><input type="text" id="c-'+k+'-f'+i+'" placeholder="Função" value="'+h(p.funcao||'')+'">'; }
     $('#c-'+k).innerHTML=html; });
 }
+function renderLogo(){
+  var tem=!!cfg.logo; $('#logoPrev').hidden=!tem; $('#logoVazio').hidden=tem; $('#logoDel').hidden=!tem;
+  if(tem) $('#logoPrev').src=cfg.logo; else $('#logoPrev').removeAttribute('src');
+  var ll=$('#loginLogo'); if(ll){ ll.src=cfg.logo||'icon-192.png'; ll.className=cfg.logo?'logo':''; }
+}
+// encaixa o logo numa faixa branca 4:1 (mesmo formato do logo original da planilha)
+function prepararLogo(file){
+  return new Promise(function(res,rej){
+    var url=URL.createObjectURL(file), img=new Image();
+    img.onload=function(){
+      var W=1200,H=300,pad=12, c=document.createElement('canvas'); c.width=W; c.height=H;
+      var x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+      var sc=Math.min((W-2*pad)/img.naturalWidth,(H-2*pad)/img.naturalHeight), w=img.naturalWidth*sc, hh=img.naturalHeight*sc;
+      x.imageSmoothingQuality='high'; x.drawImage(img,(W-w)/2,(H-hh)/2,w,hh); URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg',0.9));
+    };
+    img.onerror=function(){ URL.revokeObjectURL(url); rej(new Error('img')); };
+    img.src=url;
+  });
+}
+$('#logoFile').addEventListener('change',async function(e){
+  var f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f) return;
+  try{ cfg.logo=await prepararLogo(f); await Store.saveConfig(cfg); renderLogo(); toast('Logo salvo. Ele vai aparecer em todos os RDOs gerados.'); }
+  catch(err){ toast('Não consegui ler essa imagem. Tente um PNG ou JPG.'); }
+});
+$('#logoDel').addEventListener('click',async function(){ delete cfg.logo; await Store.saveConfig(cfg); renderLogo(); toast('Logo removido. O RDO volta a usar o logo padrão.'); });
 var cfgFormDirty=false, cfgTimer=null;
 async function saveCfgFromForm(quiet){
   if(!$('#c-obra')) return;
@@ -1108,7 +1146,7 @@ $('#genBtn').addEventListener('click',function(){ if(saveTimer){ clearTimeout(sa
 document.addEventListener('visibilitychange',function(){ if(document.hidden&&saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); } });
 
 // ---------- boot ----------
-var APP_VERSION=12;
+var APP_VERSION=13;
 if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{ r.update(); }catch(e){} }).catch(function(){}); }); }
 async function forceUpdate(){
   var b=$('#updBtn'); if(b){ b.disabled=true; b.textContent='Atualizando…'; }
@@ -1127,8 +1165,8 @@ document.addEventListener('visibilitychange',function(){ if(!document.hidden) ch
 setTimeout(checkVersion,1500);
 try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 (async function boot(){
-  lockApp(sessao()? 'Confirme sua senha para entrar.' : '');
   var c=LS.get('config'); if(c) cfg=Object.assign(clone(DEFAULT_CFG),c);
+  lockApp(sessao()? 'Confirme sua senha para entrar.' : '');
   rdo=normRdo(LS.get('d:'+todayISO()),todayISO()); renderAll(); setSync('conectando…');
   var cl=window.claude;
   if(cl&&cl.use){
