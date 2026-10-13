@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = 3;   // troque junto com version.json a cada publicação
+var APP_VER = 4;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -45,9 +45,10 @@ var MODELOS=window.FVS_MODELOS||[];
 function modeloById(id){ return MODELOS.find(function(m){ return m.id===id; }); }
 function saveCfg(){ LS.set('cfg',cfg); setTitle(); }
 function setTitle(){ document.title=(cfg.obra||'').trim()||'FVS'; }
-// mesmo script e login do RDO (planilha MATRIX_CAJAMAR_PRODUTIVIDADE); as FVS vão para a MATRIZ_CAJAMAR_FVS
-var GS_DEFAULT='https://script.google.com/macros/s/AKfycbwNjEGvhJYB1FAmDcQvhpafMJMt_M6qzU1W_Ef--FL_E4yFiuTMYKWJuvANdEZsxG_qzg/exec';
+// script próprio do FVS (projeto separado do RDO), instalado na planilha MATRIZ_CAJAMAR_FVS
+var GS_DEFAULT='';
 function gsUrl(){ return (cfg.gsUrl&&/\/exec/.test(cfg.gsUrl))? cfg.gsUrl : GS_DEFAULT; }
+var URL_RE=/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/;
 
 var saveTimers={};
 function touch(f){ f=f||cur; if(!f) return; f.atualizado=Date.now(); setSync('salvando…'); clearTimeout(saveTimers[f.id]);
@@ -416,7 +417,7 @@ async function gsPost(payload){
   var body=JSON.stringify(payload);
   try{
     var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body,redirect:'follow'});
-    var j=await res.json(); if(naoAutorizado(j)) throw new Error('login'); if(!j.ok) throw new Error(codigoAntigo(j)? 'a planilha ainda está com o código antigo (falta o arquivo FVS no Apps Script)' : (j.erro||'erro no script')); return true;
+    var j=await res.json(); if(naoAutorizado(j)) throw new Error('login'); if(!j.ok) throw new Error(codigoAntigo(j)? 'o script da planilha não reconheceu o envio (confira o código FVS.gs publicado)' : (j.erro||'erro no script')); return true;
   }catch(e){
     if(e&&e.message==='login') throw e;
     if(e&&e.message&&!/Failed to fetch|Load failed|NetworkError|JSON|Unexpected/.test(e.message)) throw e;
@@ -460,14 +461,15 @@ async function gsSendAll(){
 }
 async function gsSaveTest(){
   var url=$('#gsUrl').value.trim(), st=$('#gsStatus'); st.hidden=false; st.className='msg';
-  if(url&&!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec/.test(url)){ st.className='msg err'; st.textContent='Esse endereço não parece do Apps Script. Ele começa com https://script.google.com/macros/s/ e termina com /exec.'; return; }
-  var novo=url&&url!==gsUrl(); cfg.gsUrl=url||GS_DEFAULT; saveCfg(); $('#gsUrl').value=gsUrl();
+  if(!url||!URL_RE.test(url)){ st.className='msg err'; st.textContent='Esse endereço não parece do Apps Script. Ele começa com https://script.google.com/macros/s/ e termina com /exec.'; return; }
+  var novo=url!==gsUrl(); cfg.gsUrl=url; saveCfg(); $('#gsUrl').value=gsUrl();
+  if(novo){ LS.set('gsenviados',{}); forceLogout('Endereço da planilha trocado. Entre com um usuário cadastrado nessa planilha.'); return; }
   st.textContent='Testando a conexão…';
   try{ var j=await gsCall({acao:'fvs',teste:true});
-    if(!j||!j.ok){ st.className='msg err'; st.textContent= j&&j.codigo==='nao_autorizado'? 'Sua sessão terminou. Entre de novo.' : (codigoAntigo(j)||!j? 'A planilha ainda está com o código antigo. No Apps Script do RDO, adicione o arquivo FVS, troque o Codigo.gs pela versão nova e publique uma nova versão.' : 'A planilha respondeu com erro: '+(j.erro||'desconhecido')); gsShow(); return; }
+    if(!j||!j.ok){ st.className='msg err'; st.textContent= j&&j.codigo==='nao_autorizado'? 'Sua sessão terminou. Entre de novo.' : 'A planilha respondeu com erro: '+((j&&j.erro)||'desconhecido')+'. Confira se o código do FVS.gs está colado e publicado como nova versão.'; gsShow(); return; }
     st.textContent='Conectado à planilha "'+j.planilha+'". As abas FVS, Itens e Indicadores estão prontas.';
   }catch(e){ st.className='msg err'; st.textContent='Não consegui falar com a planilha. Confira a internet e tente de novo.'; gsShow(); return; }
-  if(novo && fichas.length){ LS.set('gsenviados',{}); gsQueuePending(); await gsFlush(); }
+  gsQueuePending(); await gsFlush();
   if(fichas.length) st.textContent+=' '+(gsQueue().length?'Algumas FVS ainda não foram enviadas.':'Todas as FVS deste celular estão na planilha.');
   gsShow();
 }
@@ -477,11 +479,12 @@ window.addEventListener('online',function(){ gsFlush(); });
 setInterval(function(){ gsQueuePending(); if(gsQueue().length||gsRemQueue().length) gsFlush(); },60000);
 document.addEventListener('visibilitychange',function(){ if(!document.hidden) gsFlush(); });
 
-// ---------- login (mesmo usuário e senha do RDO) ----------
+// ---------- login (usuários da aba Usuarios da planilha de FVS) ----------
 function sessao(){ return LS.get('sessao'); }
 var desbloqueado=false;
 function lockApp(msg){ desbloqueado=false; document.body.classList.add('locked'); $('#login').hidden=false; $('#loginObra').textContent=cfg.obra||'FVS'; renderLogo();
   var s=sessao(); if(s&&!$('#lgUser').value) $('#lgUser').value=s.usuario||''; $('#lgPass').value='';
+  $('#lgUrlBox').hidden=!!gsUrl();
   var e=$('#lgErr'); e.hidden=!msg; e.textContent=msg||'';
   setTimeout(function(){ try{ ($('#lgUser').value? $('#lgPass') : $('#lgUser')).focus(); }catch(x){} },50); }
 function unlockApp(){ desbloqueado=true; document.body.classList.remove('locked'); $('#login').hidden=true; $('#lgPass').value='';
@@ -500,6 +503,9 @@ function naoAutorizado(j){ if(j&&j.codigo==='nao_autorizado'){ forceLogout('Seu 
 async function doLogin(ev){
   ev.preventDefault();
   var u=$('#lgUser').value.trim(), p=$('#lgPass').value, btn=$('#lgBtn'), err=$('#lgErr');
+  if(!gsUrl()){ var nu=$('#lgUrl').value.trim();
+    if(!URL_RE.test(nu)){ err.hidden=false; err.textContent='Cole o endereço do script da planilha de FVS. Ele começa com https://script.google.com/macros/s/ e termina com /exec.'; return; }
+    cfg.gsUrl=nu; saveCfg(); }
   if(!u||!p){ err.hidden=false; err.textContent='Digite usuário e senha.'; return; }
   btn.disabled=true; btn.textContent='Entrando…'; err.hidden=true;
   var s0=sessao();
@@ -514,7 +520,7 @@ async function doLogin(ev){
     var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'login',usuario:u,senha:p}),redirect:'follow'});
     var j=await res.json();
     if(!j.ok){ err.hidden=false; err.textContent=j.erro||'Usuário ou senha incorretos.'; return; }
-    if(!j.token){ err.hidden=false; err.textContent='A planilha ainda está com o código antigo. O responsável precisa atualizar o script (versão com login) e publicar a nova versão.'; return; }
+    if(!j.token){ err.hidden=false; err.textContent='Esse endereço não é do script de FVS com login. Confira se colou o endereço certo (o do script da planilha MATRIZ_CAJAMAR_FVS) e se publicou a versão nova.'; return; }
     if(s0&&s0.token&&s0.token!==j.token){ try{ fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'sair',token:s0.token}),redirect:'follow'}); }catch(x){} }
     LS.set('sessao',{token:j.token,usuario:j.usuario,nome:j.nome,desde:Date.now()});
     await guardarCred(j.usuario,p); tentativasLocais=0;

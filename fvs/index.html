@@ -240,7 +240,8 @@ body.locked > *:not(#login):not(script){display:none!important}
   <form class="in" id="loginForm" autocomplete="on" novalidate>
     <img src="icon-192.png" alt="" id="loginLogo">
     <h1 id="loginObra">FVS</h1>
-    <p class="sub">Fichas de Verificação de Serviço. Entre com o mesmo usuário e senha do RDO, cadastrados pelo responsável da obra.</p>
+    <p class="sub">Fichas de Verificação de Serviço. Entre com o usuário e a senha que o responsável pela obra cadastrou para você na planilha de FVS.</p>
+    <label id="lgUrlBox" hidden>Endereço da planilha (só na primeira vez)<input type="text" id="lgUrl" inputmode="url" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></label>
     <label>Usuário<input type="text" id="lgUser" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required></label>
     <label>Senha<input type="password" id="lgPass" name="password" autocomplete="current-password" required></label>
     <div class="err" id="lgErr" hidden></div>
@@ -335,7 +336,7 @@ body.locked > *:not(#login):not(script){display:none!important}
     <button type="button" class="btn dark full" id="saveCfg">Salvar dados da obra</button>
   </div>
   <h2 class="sheet-h">Google Sheets</h2>
-  <p class="note">Já vem ligado à planilha MATRIZ_CAJAMAR_FVS, pelo mesmo script e login do RDO. Só troque o endereço se mudar de planilha. Cada FVS salva vai sozinha para as abas FVS, Itens e Indicadores, onde a planilha calcula a % de aprovação de cada processo. Sem internet, o app guarda e envia depois.</p>
+  <p class="note">Ligado à planilha MATRIZ_CAJAMAR_FVS pelo script próprio do FVS (separado do RDO). Só troque o endereço se mudar de planilha; ao trocar, o app pede login de novo. Cada FVS salva vai sozinha para as abas FVS, Itens e Indicadores, onde a planilha calcula a % de aprovação de cada processo. Sem internet, o app guarda e envia depois.</p>
   <div class="card pad">
     <label class="field"><span class="lbl">Endereço do App da Web</span><input type="text" id="gsUrl" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></label>
     <button type="button" class="btn dark full" id="gsSave">Salvar e testar</button>
@@ -344,7 +345,7 @@ body.locked > *:not(#login):not(script){display:none!important}
     <button type="button" class="btn full" id="gsSendAll">Enviar todas as FVS agora</button>
   </div>
   <h2 class="sheet-h">Lembretes</h2>
-  <p class="note">Uma notificação por volta das 10h e das 19h, junto com a do RDO, avisando quantos reparos estão pendentes e quantas FVS estão em aberto.</p>
+  <p class="note">Uma notificação por volta das 10h e das 19h avisando quantos reparos estão pendentes e quantas FVS estão em aberto.</p>
   <div class="card pad">
     <button type="button" class="btn pri full" id="ntAtivar">Ativar lembretes</button>
     <button type="button" class="btn full" id="ntTestar" hidden>Mandar uma notificação de teste</button>
