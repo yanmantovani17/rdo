@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<title>RDO Golgi Rodoanel</title>
+<title>RDO</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
@@ -162,6 +162,18 @@ textarea{resize:vertical;min-height:88px}
 .st-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:.82rem;color:var(--muted)}
 .st-legend span{display:inline-flex;align-items:center;gap:6px}
 .st-legend .st{margin:0;width:11px;height:11px}
+.swipe{position:relative;border-radius:8px;overflow:hidden;background:var(--warn)}
+.swipe .hrow{position:relative;z-index:1;transition:transform .2s ease;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.swipe.drag .hrow{transition:none}
+.swipe .del{position:absolute;top:0;bottom:0;width:104px;border:0;background:var(--warn);color:#fff;font-weight:700;font-size:1rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer}
+.swipe .del-l{left:0}.swipe .del-r{right:0}
+.swipe .del svg{width:22px;height:22px}
+.hint{font-size:.8rem;color:var(--muted)}
+#cfmBack{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;padding:16px}
+#cfmBox{width:100%;max-width:480px;background:var(--surface);color:var(--ink);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;margin-bottom:env(safe-area-inset-bottom,0px)}
+#cfmBox h3{margin:0;font-family:var(--f-display);font-size:1.25rem;letter-spacing:.04em;text-transform:uppercase}
+#cfmBox p{margin:0;color:var(--muted);font-size:.95rem}
+#cfmBox .btn.danger{background:var(--warn);border-color:var(--warn);color:#fff}
 .hist{display:flex;flex-direction:column;gap:8px}
 .hrow{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 .hrow .d{font-family:var(--f-mono);font-weight:600}
@@ -318,7 +330,7 @@ body.locked > *:not(#login):not(script){display:none!important}
   <h2 class="sheet-h">Backup</h2>
   <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
   <div class="backup"><button type="button" class="btn" id="expBk">Exportar backup</button><label class="btn">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
-  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 11</p>
+  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 12</p>
 </main>
 
 <div class="bar" id="bar">
@@ -328,6 +340,11 @@ body.locked > *:not(#login):not(script){display:none!important}
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div id="cfmBack" hidden><div id="cfmBox" role="dialog" aria-modal="true" aria-labelledby="cfmTit">
+  <h3 id="cfmTit">Apagar RDO?</h3>
+  <p id="cfmTxt"></p>
+  <div class="row"><button type="button" class="btn grow" id="cfmNo">Cancelar</button><button type="button" class="btn danger grow" id="cfmYes">Apagar</button></div>
+</div></div>
 <div id="updBar" hidden style="position:fixed;left:16px;right:16px;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:40;background:var(--signal);color:var(--signal-ink);border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.3)">
   <span style="flex:1;font-weight:600">Nova versão do app disponível.</span>
   <button type="button" class="btn dark" id="updBtn">Atualizar agora</button>
@@ -350,7 +367,7 @@ function br(iso){ if(!iso) return ''; var p=iso.split('-'); return p[2]+'/'+p[1]
 
 // Template-derived defaults (the structure of the uploaded RDO model), used until the obra is configured
 var DEFAULT_CFG = {
-  obra:'GOLGI RODOANEL NORTE', inicio:'2026-02-26', termino:'2026-12-17',
+  obra:'', inicio:'2026-02-26', termino:'2026-12-17',
   empresas:['Libercon Engenharia','Libercon Construções','LHM','Globall','Império Construções','Perfurac','Stack','Geositu','J2R','Alphageos','Roll-on','Geocoring','Premovale','TNG'],
   equipamentos:['Gerador','Máquina de compactação dinâmica','Retroescavadeira','Escavadeira','Caminhão','Munck','Motoniveladora','Rolo compactador liso','Rolo compactador pé de carneiro','Guindaste','Plataforma elevatória articulada','Bate-estaca'],
   funcoesExtras:[], funcoesVisExtras:[],
@@ -415,7 +432,7 @@ var photoURLs={};
 function totalEfetivo(r){ var t=0; Object.keys(r.efetivo||{}).forEach(function(e){ var q=r.efetivo[e]||{}; Object.keys(q).forEach(function(f){ t+=(+q[f]||0); }); }); return t; }
 function summaryOf(r){ if(!r) return {}; var ativ=(r.atividades||[]).filter(function(a){return a.desc;}).length;
   return {efetivo:totalEfetivo(r), atividades:ativ, producao:(r.producao||[]).filter(function(p){ return +p.producao>0; }).length, fotos:(r.fotos||[]).length, clima:[r.clima&&r.clima.manha&&r.clima.manha.cond, r.clima&&r.clima.tarde&&r.clima.tarde.cond].filter(Boolean).join('/'), updatedAt:r.updatedAt||0}; }
-function rdoNumber(date){ var a=G.serial(date), b=G.serial(cfg.inicio); return (a&&b)? a-b+1 : null; }
+function rdoNumber(date){ var a=G.serial(date), b=G.serial(cfg.inicio); return (a&&b&&a>=b)? a-b+1 : null; }
 
 var saveTimer=null;
 function touch(){ rdo.updatedAt=Date.now(); setSync('salvando…'); clearTimeout(saveTimer); saveTimer=setTimeout(doSave,700); updateProgress(); }
@@ -462,7 +479,7 @@ function refreshSummary(key){ var s=SECTIONS.find(function(x){return x[0]===key;
 function rerender(key){ var s=SECTIONS.find(function(x){return x[0]===key;}); var d=$('#sec-'+key); var old=$('.body',d); var b=document.createElement('div'); b.className='body'; old.replaceWith(b); s[3](b); refreshSummary(key); }
 function changed(key){ refreshSummary(key); touch(); }
 function updateProgress(){ var req=SECTIONS.filter(function(s){ return s[0]!=='visit'; }); var n=req.filter(function(s){ return done(s[0]); }).length; $('#prog').innerHTML='<b>'+n+'/'+req.length+'</b>seções ok'; }
-function updateHeader(){ $('#obraName').innerHTML=h(cfg.obra||'RDO')+'<small>Relatório Diário de Obra</small>'; var n=rdoNumber(rdo.data); $('#rdoNum').textContent='Nº '+(n||'—'); $('#dayInput').value=rdo.data; }
+function updateHeader(){ document.title=(cfg.obra||'').trim()||'RDO'; $('#obraName').innerHTML=h(cfg.obra||'RDO')+'<small>Relatório Diário de Obra</small>'; var n=rdoNumber(rdo.data); $('#rdoNum').textContent='Nº '+(n||'—'); $('#dayInput').value=rdo.data; }
 
 function chipGroup(opts, val, attrs){ return '<div class="chips">'+opts.map(function(o){ return '<button type="button" class="chip" aria-pressed="'+(o===val)+'" '+attrs+' data-v="'+h(o)+'">'+h(o)+'</button>'; }).join('')+'</div>'; }
 
@@ -860,7 +877,8 @@ async function gsPost(payload){
 async function gsQueuePending(){ try{ var list=await Store.list(), sent=LS.get('gsenviados')||{}, q=gsQueue();
   Object.keys(list).forEach(function(d){ var u=(list[d]&&list[d].updatedAt)||1; if(!(sent[d]>=u) && q.indexOf(d)<0) q.push(d); }); gsSetQueue(q); }catch(e){} }
 async function gsFlush(){
-  if(gsBusy||!sessao()) return; var q=gsQueue(); if(!q.length){ gsShow(); return; }
+  if(gsBusy||!sessao()) return;
+  var ap=LS.get('gsapagar')||[]; if(ap.length&&navigator.onLine){ try{ await gsPost({dias:ap.map(function(d){ return {obra:cfg.obra||'OBRA',data:d,tabelas:{}}; })}); LS.set('gsapagar',[]); }catch(e){} } var q=gsQueue(); if(!q.length){ gsShow(); return; }
   if(!navigator.onLine){ gsShow(); return; }
   gsBusy=true;
   try{
@@ -874,7 +892,7 @@ async function gsFlush(){
     }
     LS.set('gsultimo',Date.now());
   }catch(e){ LS.set('gserro',String(e&&e.message||e)); }
-  finally{ gsBusy=false; gsShow(); if(!$('#view-hist').hidden) renderHist(); }
+  finally{ gsBusy=false; gsShow(); if(!$('#view-hist').hidden && !document.querySelector('.swipe.drag, .swipe .hrow[style*="translate"]') && $('#cfmBack').hidden) renderHist(); }
 }
 function gsShow(){
   var q=gsQueue(), last=LS.get('gsultimo'), err=LS.get('gserro');
@@ -957,13 +975,53 @@ async function renderHist(){
     var enviado=!!(sent[dd] && sent[dd]>=(rr.updatedAt||1)) && fila.indexOf(dd)<0;
     info[dd]={falta:falta,enviado:enviado,ok:!falta.length&&enviado}; }
   var nOk=days.filter(function(d){ return info[d].ok; }).length;
-  host.innerHTML='<div class="st-legend"><span><i class="st ok"></i>Concluído e enviado ('+nOk+')</span><span><i class="st pend"></i>Em andamento ('+(days.length-nOk)+')</span></div>'+days.map(function(d){ var s=list[d]||{}; var dn=G.weekday(d); var it=info[d];
+  var temPend=days.some(function(d){ return !info[d].ok; });
+  host.innerHTML='<div class="st-legend"><span><i class="st ok"></i>Concluído e enviado ('+nOk+')</span><span><i class="st pend"></i>Em andamento ('+(days.length-nOk)+')</span></div>'+(temPend?'<div class="hint">Arraste um RDO em andamento para o lado para apagar.</div>':'')+days.map(function(d){ var s=list[d]||{}; var dn=G.weekday(d); var it=info[d];
     var miss=[]; if(it.falta.length) miss.push('Falta: '+it.falta.join(', ')); if(!it.enviado) miss.push('aguardando envio para a planilha');
-    return '<div class="hrow"><i class="st '+(it.ok?'ok':'pend')+'" title="'+(it.ok?'Concluído':'Em andamento')+'" aria-label="'+(it.ok?'Concluído':'Em andamento')+'"></i><div class="grow"><div class="d">'+br(d)+' · Nº '+(rdoNumber(d)||'—')+'</div><div class="s">'+dn+' · '+(s.efetivo||0)+' pessoas · '+(s.atividades||0)+' atividades'+(s.producao?' · '+s.producao+' produção':'')+(s.clima?' · '+h(s.clima):'')+'</div>'+(miss.length?'<div class="st-miss">'+h(miss.join(' · '))+'</div>':'<div class="st-miss" style="color:var(--ok)">Completo e na planilha</div>')+'</div>'+
-      '<button type="button" class="btn" data-open="'+d+'">Abrir</button><button type="button" class="btn dark" data-gen="'+d+'" aria-label="Gerar Excel de '+br(d)+'">Excel</button></div>';
+    var abre= it.ok? '' : '<div class="swipe" data-sw="'+d+'"><button type="button" class="del del-l" data-del="'+d+'" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>Apagar</button><button type="button" class="del del-r" data-del="'+d+'" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>Apagar</button>';
+    return abre+'<div class="hrow"><i class="st '+(it.ok?'ok':'pend')+'" title="'+(it.ok?'Concluído':'Em andamento')+'" aria-label="'+(it.ok?'Concluído':'Em andamento')+'"></i><div class="grow"><div class="d">'+br(d)+' · Nº '+(rdoNumber(d)||'—')+'</div><div class="s">'+dn+' · '+(s.efetivo||0)+' pessoas · '+(s.atividades||0)+' atividades'+(s.producao?' · '+s.producao+' produção':'')+(s.clima?' · '+h(s.clima):'')+'</div>'+(miss.length?'<div class="st-miss">'+h(miss.join(' · '))+'</div>':'<div class="st-miss" style="color:var(--ok)">Completo e na planilha</div>')+'</div>'+
+      '<button type="button" class="btn" data-open="'+d+'">Abrir</button><button type="button" class="btn dark" data-gen="'+d+'" aria-label="Gerar Excel de '+br(d)+'">Excel</button></div>'+(it.ok?'':'</div>');
   }).join('');
+  ligarSwipe(host);
 }
-$('#histList').addEventListener('click',async function(e){ var o=e.target.closest('[data-open]'); if(o){ await loadDay(o.dataset.open); showView('dia'); }
+// ---------- arrastar para apagar ----------
+function ligarSwipe(host){
+  $$('.swipe',host).forEach(function(sw){
+    var row=sw.querySelector('.hrow'), x0=0, y0=0, dx=0, ativo=false, horiz=null, aberto=0, arrastou=false;
+    function pos(v){ row.style.transform= v? 'translateX('+v+'px)' : ''; }
+    function fechar(){ aberto=0; pos(0); }
+    row.addEventListener('pointerdown',function(e){ if(e.target.closest('button')) return; ativo=true; horiz=null; x0=e.clientX; y0=e.clientY; dx=0; });
+    row.addEventListener('pointermove',function(e){ if(!ativo) return; var mx=e.clientX-x0, my=e.clientY-y0;
+      if(horiz===null){ if(Math.abs(mx)<8&&Math.abs(my)<8) return; horiz=Math.abs(mx)>Math.abs(my); if(horiz){ sw.classList.add('drag'); try{ row.setPointerCapture(e.pointerId); }catch(x){} } }
+      if(!horiz) return; e.preventDefault(); dx=Math.max(-140,Math.min(140,aberto+mx)); pos(dx); });
+    function soltar(){ if(!ativo) return; ativo=false; sw.classList.remove('drag'); if(!horiz){ return; } arrastou=true; setTimeout(function(){ arrastou=false; },350);
+      if(dx>60){ aberto=104; pos(104); } else if(dx<-60){ aberto=-104; pos(-104); } else fechar();
+      $$('.swipe',host).forEach(function(o){ if(o!==sw){ var r=o.querySelector('.hrow'); r.style.transform=''; } }); }
+    row.addEventListener('pointerup',soltar); row.addEventListener('pointercancel',soltar);
+    row.addEventListener('click',function(e){ if(arrastou){ e.stopPropagation(); e.preventDefault(); arrastou=false; return; } if(aberto&&!e.target.closest('button')){ e.stopPropagation(); fechar(); } },true);
+  });
+}
+var apagarDia=null;
+function pedirApagar(d){ apagarDia=d; $('#cfmTit').textContent='Apagar o RDO de '+br(d)+'?';
+  $('#cfmTxt').textContent='Isso apaga tudo o que foi preenchido nesse dia, inclusive as fotos e as linhas desse dia na planilha do Google. Não dá para desfazer.';
+  $('#cfmBack').hidden=false; $('#cfmNo').focus(); }
+function fecharConfirma(){ $('#cfmBack').hidden=true; apagarDia=null; }
+async function apagarRdo(d){
+  var r=normRdo(await Store.getRdo(d),d);
+  (r.fotos||[]).forEach(function(f){ IDB.del(f.id); if(photoURLs[f.id]){ try{ URL.revokeObjectURL(photoURLs[f.id]); }catch(e){} delete photoURLs[f.id]; } });
+  try{ localStorage.removeItem('rdo:d:'+d); }catch(e){}
+  var idx=LS.get('index')||{}; delete idx[d]; LS.set('index',idx);
+  var sent=LS.get('gsenviados')||{}, estava=!!sent[d]; delete sent[d]; LS.set('gsenviados',sent);
+  gsSetQueue(gsQueue().filter(function(x){ return x!==d; }));
+  if(rdo.data===d){ rdo=blankRdo(d); renderAll(); }
+  // tira as linhas desse dia da planilha (envio vazio = apaga)
+  if(estava && sessao()){ try{ await gsPost({dias:[{obra:cfg.obra||'OBRA',data:d,tabelas:{}}]}); }catch(e){ var pend=LS.get('gsapagar')||[]; if(pend.indexOf(d)<0) pend.push(d); LS.set('gsapagar',pend); } }
+  toast('RDO de '+br(d)+' apagado.'); renderHist();
+}
+$('#cfmNo').addEventListener('click',fecharConfirma);
+$('#cfmBack').addEventListener('click',function(e){ if(e.target.id==='cfmBack') fecharConfirma(); });
+$('#cfmYes').addEventListener('click',function(){ var d=apagarDia; fecharConfirma(); if(d) apagarRdo(d); });
+$('#histList').addEventListener('click',async function(e){ var x=e.target.closest('[data-del]'); if(x){ pedirApagar(x.dataset.del); return; } var o=e.target.closest('[data-open]'); if(o){ await loadDay(o.dataset.open); showView('dia'); }
   var g=e.target.closest('[data-gen]'); if(g){ var d=g.dataset.gen; var r=normRdo(await Store.getRdo(d),d); generate(r); } });
 
 // ---------- config ----------
@@ -1050,7 +1108,7 @@ $('#genBtn').addEventListener('click',function(){ if(saveTimer){ clearTimeout(sa
 document.addEventListener('visibilitychange',function(){ if(document.hidden&&saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); } });
 
 // ---------- boot ----------
-var APP_VERSION=11;
+var APP_VERSION=12;
 if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{ r.update(); }catch(e){} }).catch(function(){}); }); }
 async function forceUpdate(){
   var b=$('#updBtn'); if(b){ b.disabled=true; b.textContent='Atualizando…'; }
