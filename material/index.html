@@ -234,6 +234,8 @@ body.locked > *:not(#login):not(#cfmBack):not(#toast):not(script){display:none!i
 #login .foot{font-size:.82rem;opacity:.6;margin-top:6px}
 
 /* ---- Controle de Material ---- */
+.logo-strip{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:10px;display:flex;align-items:center;justify-content:center}
+.logo-strip img{max-width:100%;max-height:64px;display:block}
 input[type=number],input.num{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:44px;font-family:var(--f-mono);text-align:right}
 .mcard{display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--line);border-radius:var(--r);padding:12px 14px;cursor:pointer;text-align:left;width:100%}
 .mcard.ok{border-left-color:var(--ok)} .mcard.pend{border-left-color:var(--warn)} .mcard.na{border-left-color:var(--na)}
@@ -323,7 +325,7 @@ select{appearance:auto}
 <div id="login" hidden>
   <div class="hz"></div>
   <form class="in" id="loginForm" autocomplete="on" novalidate>
-    <img src="icon-192.png" alt="">
+    <img src="icon-192.png" alt="" id="loginLogo">
     <h1 id="loginObra">Controle de Material</h1>
     <p class="sub">Previsto no projeto × usado de verdade. Entre com o usuário e a senha cadastrados na aba Usuarios da planilha de materiais.</p>
     <label id="lgUrlBox" hidden>Endereço do script da planilha (termina em /exec)<input type="text" id="lgUrl" inputmode="url" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></label>
@@ -362,6 +364,7 @@ select{appearance:auto}
 
 <!-- PAINEL -->
 <main class="wrap" id="view-painel">
+  <div class="logo-strip" id="pnLogo" hidden><img alt="Logo da empresa"></div>
   <div class="list" id="mcards"></div>
 </main>
 
@@ -466,9 +469,23 @@ select{appearance:auto}
     <p class="note" id="gsInfo"></p>
     <div class="row"><button type="button" class="btn grow" id="gsSendAll">Reenviar tudo</button><button type="button" class="btn grow" id="gsPull">Baixar da planilha</button></div>
   </div>
-  <h2 class="sheet-h">Relatório</h2>
-  <p class="note">Excel com o resumo por material, a perda por tipo de peça, os lançamentos, as NFs e o projeto.</p>
-  <button type="button" class="btn pri full" id="xlsBtn">Exportar controle em Excel</button>
+  <h2 class="sheet-h">Relatório geral</h2>
+  <p class="note">PDF com o logo da empresa: resumo de todos os materiais, pontos de atenção, perda por tipo de peça, por mês e a lista de lançamentos com as NFs. Escolha o período (em branco = tudo).</p>
+  <div class="card pad">
+    <div class="grid2">
+      <label class="field"><span class="lbl">De</span><input type="date" id="rDe"></label>
+      <label class="field"><span class="lbl">Até</span><input type="date" id="rAte"></label>
+    </div>
+    <div class="chips" id="rAtalhos"><button type="button" class="chip" data-per="tudo">Tudo</button><button type="button" class="chip" data-per="mes">Este mês</button><button type="button" class="chip" data-per="mesant">Mês passado</button><button type="button" class="chip" data-per="7">Últimos 7 dias</button></div>
+    <button type="button" class="btn pri full" id="pdfBtn">Gerar relatório geral (PDF)</button>
+    <button type="button" class="btn full" id="xlsBtn">Exportar controle em Excel</button>
+  </div>
+  <h2 class="sheet-h">Logo da empresa</h2>
+  <div class="card pad">
+    <div class="logo-box" id="logoBox"><img id="logoPrev" alt="Logo da empresa" hidden><span id="logoVazio">Sem logo. Escolha uma imagem para aparecer na tela de entrada, no Painel e no relatório.</span></div>
+    <div class="row"><label class="btn dark grow">Escolher logo<input type="file" id="logoFile" accept="image/*" hidden></label><button type="button" class="btn ghost" id="logoDel" hidden>Remover</button></div>
+    <span class="note">PNG ou JPG, de preferência na horizontal. Fica guardado neste celular; cada pessoa escolhe uma vez no seu.</span>
+  </div>
   <h2 class="sheet-h">Backup</h2>
   <p class="note">A planilha Google já guarda tudo. O backup é uma cópia extra deste celular.</p>
   <div class="row"><button type="button" class="btn grow" id="expBk">Exportar backup</button><label class="btn grow">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>

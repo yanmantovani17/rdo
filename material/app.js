@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = 4;   // troque junto com version.json a cada publicação
+var APP_VER = 5;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -93,10 +93,10 @@ function itensDe(matId){ return lista(ITENS).filter(function(it){ return it.mat=
 function lancsDe(matId){ return lista(LANCS).filter(function(l){ return l.mat===matId; }); }
 function cmp(a,b){ return String(a).localeCompare(String(b),'pt-BR',{numeric:true}); }
 function ordItem(a,b){ return cmp(a.grupo||'',b.grupo||'') || cmp(a.cod,b.cod); }
-function agg(matId){
+function agg(matId, filtro){
   var m=MATS[matId]||{}, A={prevProj:0, prev:0, real:0, perdaJ:0, semPeca:0, rec:0, n:0, itens:{}, meses:{}};
   itensDe(matId).forEach(function(it){ A.prevProj+=num(it.qu)*num(it.n); A.itens[it.id]={exec:0, prev:0, real:0}; });
-  lancsDe(matId).forEach(function(l){ var c=calc(l); A.n++; A.rec+=c.rec;
+  lancsDe(matId).forEach(function(l){ if(filtro && !filtro(l)) return; var c=calc(l); A.n++; A.rec+=c.rec;
     var ym=String(l.data||'').slice(0,7), M=A.meses[ym]=A.meses[ym]||{prev:0, real:0, semPeca:0, n:0}; M.n++;
     if(c.prev>0){ A.prev+=c.prev; A.real+=c.real; A.perdaJ+=c.perdaJ; M.prev+=c.prev; M.real+=c.real; }
     else { A.semPeca+=c.real; M.semPeca+=c.real; }
@@ -141,7 +141,7 @@ function rerender(){ if(view==='obra'){ gsShow(); verLine(); return; } if(view==
 
 // ---------- painel ----------
 function renderPainel(){
-  $('#obraName').innerHTML=h(cfg.obra||'Material')+'<small>Controle de Material</small>';
+  $('#obraName').innerHTML=h(cfg.obra||'Material')+'<small>Controle de Material</small>'; renderLogo();
   var mats=lista(MATS).filter(function(m){ return m.ativo!==false || lancsDe(m.id).length; }).sort(function(a,b){ return cmp(a.nome,b.nome); });
   var el=$('#mcards');
   if(!mats.length){
@@ -669,7 +669,7 @@ setInterval(function(){ if(!document.hidden) sincronizar(); },120000);
 
 // ---------- login ----------
 var desbloqueado=false;
-function lockApp(msg){ if(TESTE){ unlockApp(); return; } desbloqueado=false; document.body.classList.add('locked'); $('#login').hidden=false; $('#loginObra').textContent=cfg.obra? 'Material · '+cfg.obra : 'Controle de Material';
+function lockApp(msg){ renderLogo(); if(TESTE){ unlockApp(); return; } desbloqueado=false; document.body.classList.add('locked'); $('#login').hidden=false; $('#loginObra').textContent=cfg.obra? 'Material · '+cfg.obra : 'Controle de Material';
   var s=sessao(); if(s&&!$('#lgUser').value) $('#lgUser').value=s.usuario||''; $('#lgPass').value='';
   $('#lgUrlBox').hidden=!!gsUrl(); if(!gsUrl() && !$('#lgUrl').value) $('#lgUrl').value=cfg.gsUrl||'';
   var e=$('#lgErr'); e.hidden=!msg; e.textContent=msg||'';
@@ -756,7 +756,7 @@ function renderCfg(){
   $('#c-obra').value=cfg.obra||''; $('#gsUrl').value=gsUrl(); gsShow();
   $('#gsCard').hidden=TESTE; $('#gsAbrir').hidden=TESTE; $('#gsNote').textContent= TESTE? 'Modo teste: nada vai para a planilha. Para usar de verdade, toque em Sair (abaixo) e entre com seu usuário da planilha de materiais.' : 'Cada lançamento salvo vai para a planilha de materiais (abas Lancamentos, Entregas, Pecas e Indicadores). O app também baixa de lá o projeto e os lançamentos das outras pessoas. Sem internet, guarda e envia depois.';
   var s=sessao(); $('#acNome').textContent= s? (s.nome+(s.teste?'':' ('+s.usuario+')')+' · '+s.perfil) : '—';
-  $('#acSair').textContent= TESTE? 'Sair do teste' : 'Sair';
+  $('#acSair').textContent= TESTE? 'Sair do teste' : 'Sair'; renderLogo();
   verLine();
 }
 var cfgFormDirty=false, cfgTimer=null;
@@ -822,6 +822,135 @@ $('#xlsBtn').addEventListener('click',async function(){
   catch(e){ console.error(e); toast('Erro ao montar a planilha.'); }
   b.disabled=false; b.textContent='Exportar controle em Excel';
 });
+
+// ---------- logo da empresa ----------
+function renderLogo(){
+  var tem=!!cfg.logo;
+  var pv=$('#logoPrev'); if(pv){ pv.hidden=!tem; $('#logoVazio').hidden=tem; $('#logoDel').hidden=!tem; if(tem) pv.src=cfg.logo; else pv.removeAttribute('src'); }
+  var ll=$('#loginLogo'); if(ll){ ll.src=cfg.logo||'icon-192.png'; ll.className=tem?'logo':''; }
+  var pn=$('#pnLogo'); if(pn){ pn.hidden=!tem; if(tem) pn.querySelector('img').src=cfg.logo; }
+}
+// encaixa o logo numa faixa branca 4:1 (mesmo formato do RDO e do FVS)
+function prepararLogo(file){
+  return new Promise(function(res,rej){
+    var url=URL.createObjectURL(file), img=new Image();
+    img.onload=function(){
+      var W=1000,H=250,pad=10, c=document.createElement('canvas'); c.width=W; c.height=H;
+      var x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+      var sc=Math.min((W-2*pad)/img.naturalWidth,(H-2*pad)/img.naturalHeight), w=img.naturalWidth*sc, hh=img.naturalHeight*sc;
+      x.imageSmoothingQuality='high'; x.drawImage(img,(W-w)/2,(H-hh)/2,w,hh); URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg',0.88));
+    };
+    img.onerror=function(){ URL.revokeObjectURL(url); rej(new Error('img')); };
+    img.src=url;
+  });
+}
+$('#logoFile').addEventListener('change',async function(e){
+  var f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f) return;
+  try{ cfg.logo=await prepararLogo(f); saveCfg(); renderLogo(); toast('Logo salvo. Aparece na entrada, no Painel e no relatório.'); }
+  catch(err){ toast('Não consegui ler essa imagem. Tente um PNG ou JPG.'); }
+});
+$('#logoDel').addEventListener('click',function(){ delete cfg.logo; saveCfg(); renderLogo(); toast('Logo removido.'); });
+
+// ---------- relatório geral (PDF) ----------
+function isoDe(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+$('#rAtalhos').addEventListener('click',function(e){ var b=e.target.closest('[data-per]'); if(!b) return; var k=b.dataset.per, h0=new Date(), de='', ate='';
+  if(k==='mes'){ de=isoDe(new Date(h0.getFullYear(),h0.getMonth(),1)); ate=todayISO(); }
+  if(k==='mesant'){ de=isoDe(new Date(h0.getFullYear(),h0.getMonth()-1,1)); ate=isoDe(new Date(h0.getFullYear(),h0.getMonth(),0)); }
+  if(k==='7'){ de=isoDe(new Date(h0.getFullYear(),h0.getMonth(),h0.getDate()-6)); ate=todayISO(); }
+  $('#rDe').value=de; $('#rAte').value=ate; $$('#rAtalhos .chip').forEach(function(x){ x.setAttribute('aria-pressed',String(x===b)); }); });
+function pdfTxt(s){ return String(s==null?'':s).replace(/\u00b3/g,'3').replace(/\u00b2/g,'2').replace(/\u00d7/g,'x').replace(/\u00f7/g,'/').replace(/\s*\u00b7\s*/g,' - ').replace(/[−–—]/g,'-').replace(/→/g,'->').replace(/…/g,'...').replace(/[‘’]/g,"'").replace(/[“”]/g,'"'); }
+async function gerarRelatorio(){
+  if(!lista(MATS).length){ toast('Ainda não há materiais para o relatório.'); return; }
+  var b=$('#pdfBtn'); b.disabled=true; b.textContent='Montando o relatório…';
+  try{
+    if(!window.jspdf) await loadScript('jspdf.umd.min.js');
+    if(!window.jspdf.jsPDF.API.autoTable) await loadScript('jspdf.plugin.autotable.min.js');
+    var de=$('#rDe').value, ate=$('#rAte').value; if(de&&ate&&de>ate){ var t=de; de=ate; ate=t; }
+    var F=function(l){ return (!de||l.data>=de) && (!ate||l.data<=ate); };
+    var doc=new window.jspdf.jsPDF({unit:'mm',format:'a4'}), W=210, H=297, M=12;
+    var ASF=[38,49,59], AMA=[232,161,0], VERDE=[47,125,79], LAR=[180,86,27], CINZA=[93,102,112];
+    var lsAll=lista(LANCS).filter(F), datas=lsAll.map(function(l){ return l.data; }).sort();
+    var perTxt= (de||ate)? 'Período: '+(de?br(de):'início')+' a '+(ate?br(ate):'hoje') : 'Período: todos os lançamentos'+(datas.length?' ('+br(datas[0])+' a '+br(datas[datas.length-1])+')':'');
+    var s=sessao(), emit='Emitido em '+new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+(s&&!s.teste?' por '+s.nome:'');
+    var topo=34;
+    function cab(){
+      doc.setFillColor.apply(doc,ASF); doc.rect(0,0,W,4,'F');
+      var x=M; if(cfg.logo){ try{ doc.addImage(cfg.logo,'JPEG',M,8,44,11); x=M+48; }catch(e){} }
+      doc.setTextColor.apply(doc,ASF); doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text(pdfTxt('RELATÓRIO DE CONTROLE DE MATERIAL'), W-M, 12, {align:'right'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc,CINZA);
+      doc.text(pdfTxt((cfg.obra?'Obra: '+cfg.obra+'  ·  ':'')+'Previsto no projeto × usado de verdade'), W-M, 17, {align:'right'});
+      doc.text(pdfTxt(perTxt), W-M, 21.5, {align:'right'});
+      for(var i=0;i<W;i+=6){ doc.setFillColor.apply(doc, (i/6)%2? ASF : AMA); doc.rect(i,26,6,1.6,'F'); }
+    }
+    var common={margin:{top:topo,left:M,right:M,bottom:14}, styles:{font:'helvetica',fontSize:7.6,cellPadding:1.4,lineColor:[213,217,214],lineWidth:0.1,textColor:[29,35,41]},
+      headStyles:{fillColor:ASF,textColor:255,fontStyle:'bold',fontSize:7.2}, alternateRowStyles:{fillColor:[245,246,244]}, didDrawPage:cab, theme:'grid'};
+    var y=topo;
+    function titulo(t, sub){ if(y>H-40){ doc.addPage(); y=topo; } doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor.apply(doc,ASF); doc.text(pdfTxt(t),M,y+4);
+      if(sub){ doc.setFont('helvetica','normal'); doc.setFontSize(7.8); doc.setTextColor.apply(doc,CINZA); var ls=doc.splitTextToSize(pdfTxt(sub),W-2*M); doc.text(ls,M,y+8.5); y+=8.5+ls.length*3.3; } else y+=7; }
+    function tabela(head, body, opt){ doc.autoTable(Object.assign({}, common, {startY:y, head:[head.map(pdfTxt)], body:body.map(function(r){ return r.map(function(c){ return (c&&typeof c==='object')? Object.assign({},c,{content:pdfTxt(c.content)}) : pdfTxt(c); }); })}, opt||{})); y=doc.lastAutoTable.finalY+6; }
+    function cor(pct,meta){ var st=stOf(pct,meta); return st==='pend'? LAR : (st==='ok'? VERDE : CINZA); }
+    function pc(pct,meta,bold){ return {content:pct==null?'-':fP(pct), styles:{textColor:cor(pct,meta), fontStyle:bold===false?'normal':'bold'}}; }
+    var R={halign:'right'};
+    cab();
+    // 1. resumo
+    var mats=lista(MATS).sort(function(a,b){ return cmp(a.nome,b.nome); }).filter(function(m){ return m.ativo!==false || lancsDe(m.id).some(F); });
+    var AG={}; mats.forEach(function(m){ AG[m.id]=agg(m.id,F); });
+    titulo('1. Resumo por material', 'Perda = real ÷ previsto das peças executadas - 1. Real = recebido - devolvido. "Sem justificadas" desconta as perdas explicadas (bomba, descarte, vazamento de forma).');
+    tabela(['Material','Un','Previsto','Real','Desvio','Perda','Aceitável','Sem justif.','Executado*','Lanç.'],
+      mats.map(function(m){ var A=AG[m.id]; return [m.nome, m.un, fV(A.prev), fV(A.real), A.prev?fD(A.real-A.prev):'-', pc(A.pct,m.meta), fN(num(m.meta),1)+'%', pc(A.pctSemJ,m.meta,false), A.execPct==null?'-':fN(A.execPct*100,1)+'%', A.n]; }),
+      {columnStyles:{0:{cellWidth:46},2:R,3:R,4:R,5:R,6:R,7:R,8:R,9:R}});
+    doc.setFontSize(7); doc.setTextColor.apply(doc,CINZA); doc.text(pdfTxt('*Executado: previsto das peças executadas no período ÷ previsto total do projeto do material.'),M,y-3); y+=2;
+    // 2. pontos de atenção
+    var alertas=[];
+    mats.forEach(function(m){ var A=AG[m.id];
+      if(A.pct!=null && stOf(A.pct,m.meta)==='pend') alertas.push(['Material acima do aceitável', m.nome, 'Perda '+fP(A.pct)+' (aceitável '+fN(num(m.meta),1)+'%): '+fD(A.real-A.prev)+' '+m.un+' a mais que o projeto']);
+      if(A.semPeca>0) alertas.push(['Consumo sem peça vinculada', m.nome, fV(A.semPeca)+' '+m.un+' lançados sem informar a peça: fora da conta de perda']); });
+    lsAll.map(function(l){ return {l:l, c:calc(l), m:MATS[l.mat]}; }).filter(function(x){ return x.m && x.c.prev && stOf(x.c.pct,x.m.meta)==='pend'; })
+      .sort(function(a,b){ return (b.c.desvio/(b.c.prev||1))-(a.c.desvio/(a.c.prev||1)); }).slice(0,12)
+      .forEach(function(x){ alertas.push(['Lançamento acima do aceitável', br(x.l.data)+' · '+x.m.nome, 'Perda '+fP(x.c.pct)+' ('+fD(x.c.desvio)+' '+x.m.un+') · '+(resumoPecas(x.l)||'')+(x.l.obs?' · Obs.: '+x.l.obs:'')]); });
+    var dup=pecasLancadas(); Object.keys(dup).forEach(function(k){ var ls=dup[k].filter(F); if(ls.length>1){ var it=ITENS[k.split('|')[0]]; if(it&&MATS[it.mat]) alertas.push(['Peça lançada mais de uma vez', MATS[it.mat].nome, it.cod+' '+k.split('|')[1].toUpperCase()+' em '+ls.map(function(l){ return br(l.data); }).join(', ')]); } });
+    titulo('2. Pontos de atenção');
+    if(alertas.length) tabela(['Tipo','Onde','Detalhe'], alertas.slice(0,40), {columnStyles:{0:{cellWidth:38,fontStyle:'bold',textColor:LAR},1:{cellWidth:44}}});
+    else { doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc,VERDE); doc.text(pdfTxt('Nenhum ponto de atenção no período: todos os materiais dentro da perda aceitável.'),M,y+2); y+=9; }
+    // 3. por material
+    var mi=-1;
+    mats.forEach(function(m){
+      var A=AG[m.id], ls=lancsDe(m.id).filter(F).sort(function(a,b){ return cmp(a.data,b.data); });
+      if(!ls.length) return; mi++;
+      doc.addPage(); y=topo;
+      doc.setFillColor.apply(doc,ASF); doc.rect(M,y,W-2*M,9,'F'); doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(11);
+      doc.text(pdfTxt('3.'+(mi+1)+'  '+m.nome.toUpperCase()), M+3, y+6.2);
+      doc.setFontSize(9); doc.text(pdfTxt(m.un+' · aceitável '+fN(num(m.meta),1)+'%'), W-M-3, y+6.2, {align:'right'}); y+=12;
+      tabela(['Perda','Previsto exec.','Real','Desvio','Perdas justif.','Projeto total','Saldo a executar','Projeção até o fim'],
+        [[pc(A.pct,m.meta), fV(A.prev)+' '+m.un, fV(A.real)+' '+m.un, (A.prev?fD(A.real-A.prev):'-')+' '+m.un, fV(A.perdaJ)+' '+m.un, fV(A.prevProj)+' '+m.un, fV(A.saldo)+' '+m.un, fV(A.proj)+' '+m.un]],
+        {styles:Object.assign({},common.styles,{fontSize:8.4,halign:'center',cellPadding:2}), headStyles:Object.assign({},common.headStyles,{halign:'center'})});
+      var its=itensDe(m.id).filter(function(it){ return A.itens[it.id].exec>0; });
+      if(its.length){ titulo('Por tipo de peça', 'Real rateado: o volume de cada lançamento é dividido entre as peças do dia na proporção do previsto.');
+        var tp=0, tr=0;
+        tabela(['Grupo','Peça','Feitas / projeto','Qtd por peça','Previsto','Real rateado','Perda'],
+          its.map(function(it){ var x=A.itens[it.id]; tp+=x.prev; tr+=x.real; return [it.grupo||'', it.cod+(it.desc&&it.desc!==it.cod?' · '+it.desc:''), fN(x.exec,1)+' / '+fN(num(it.n),0), fN(it.qu,3), fV(x.prev), fV(x.real), pc(x.prev?x.real/x.prev-1:null,m.meta)]; })
+            .concat([[{content:'Total',styles:{fontStyle:'bold'}},'','','',{content:fV(tp),styles:{fontStyle:'bold'}},{content:fV(tr),styles:{fontStyle:'bold'}},pc(tp?tr/tp-1:null,m.meta)]]),
+          {columnStyles:{0:{cellWidth:42},2:R,3:R,4:R,5:R,6:R}}); }
+      var ms=Object.keys(A.meses).sort();
+      if(ms.length>1){ titulo('Por mês'); tabela(['Mês','Lançamentos','Previsto','Real','Perda','Sem peça'], ms.map(function(ym){ var x=A.meses[ym]; return [mesNome(ym), x.n, fV(x.prev), fV(x.real), pc(x.prev?x.real/x.prev-1:null,m.meta), x.semPeca?fV(x.semPeca):'-']; }), {columnStyles:{1:R,2:R,3:R,4:R,5:R}}); }
+      titulo('Lançamentos ('+ls.length+')');
+      if(ls.length) tabela(['Data','Peças executadas','NF / caminhão','Previsto','Real','Perda','Observação'],
+        ls.map(function(l){ var c=calc(l); var nfs=(l.ent||[]).map(function(e){ return (e.doc||'s/ NF')+(e.veic?' ('+e.veic+')':'')+': '+fN(e.q,2); }).join('\n');
+          var aj=[]; if(c.dev) aj.push('Devolvido '+fV(c.dev)); (l.perdas||[]).forEach(function(p){ aj.push(p.mot+' '+fV(num(p.q))); });
+          return [br(l.data), resumoPecas(l)||'(sem peça)', nfs, c.prev?fV(c.prev):'-', fV(c.real), pc(c.pct,m.meta), [aj.join('; '), l.obs||''].filter(Boolean).join('\n')]; }),
+        {styles:Object.assign({},common.styles,{fontSize:6.9}), columnStyles:{0:{cellWidth:15},1:{cellWidth:44},2:{cellWidth:34},3:Object.assign({cellWidth:15},R),4:Object.assign({cellWidth:14},R),5:Object.assign({cellWidth:14},R)}});
+      else { doc.setFontSize(8.5); doc.setTextColor.apply(doc,CINZA); doc.text('Sem lançamentos no período.',M,y+2); y+=8; }
+    });
+    var n=doc.getNumberOfPages();
+    for(var p=1;p<=n;p++){ doc.setPage(p); doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor.apply(doc,CINZA);
+      doc.text(pdfTxt(emit+'  ·  Controle de Material'), M, H-6); doc.text('Página '+p+' de '+n, W-M, H-6, {align:'right'}); }
+    var nome='Relatório de Material - '+(cfg.obra||'obra').replace(/[\\/:*?"<>|]+/g,'-')+' - '+(de||ate? (de?br(de):'inicio')+' a '+(ate?br(ate):'hoje') : 'geral '+br(todayISO())).replace(/\//g,'-')+'.pdf';
+    await deliver(nome, doc.output('blob'), 'application/pdf', 'Relatório pronto.');
+  }catch(e){ console.error(e); toast('Erro ao montar o relatório. Abra o app com internet uma vez e tente de novo.'); }
+  finally{ b.disabled=false; b.textContent='Gerar relatório geral (PDF)'; }
+}
+$('#pdfBtn').addEventListener('click',gerarRelatorio);
 
 // ---------- backup ----------
 $('#expBk').addEventListener('click',async function(){

@@ -1,6 +1,6 @@
 // Mantém o app funcionando sem internet. Ao publicar uma nova versão, troque VERSAO.
-const VERSAO = 'mat-v4';
-const ARQUIVOS = ['./', 'index.html', 'app.js', 'carga.js', 'exemplo.js', 'xlsx.mini.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
+const VERSAO = 'mat-v5';
+const ARQUIVOS = ['./', 'index.html', 'app.js', 'carga.js', 'exemplo.js', 'xlsx.mini.min.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSAO).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('mat-') && k !== VERSAO).map(k => caches.delete(k)))).then(() => self.clients.claim()));
