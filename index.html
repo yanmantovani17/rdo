@@ -318,7 +318,7 @@ body.locked > *:not(#login):not(script){display:none!important}
   <h2 class="sheet-h">Backup</h2>
   <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
   <div class="backup"><button type="button" class="btn" id="expBk">Exportar backup</button><label class="btn">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
-  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 10</p>
+  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 11</p>
 </main>
 
 <div class="bar" id="bar">
@@ -777,23 +777,46 @@ function gsQueue(){ return LS.get('gsfila')||[]; }
 function gsSetQueue(q){ LS.set('gsfila',q); }
 // ---------- login ----------
 function sessao(){ return LS.get('sessao'); }
-function lockApp(msg){ document.body.classList.add('locked'); $('#login').hidden=false; $('#loginObra').textContent=cfg.obra||'RDO';
-  var e=$('#lgErr'); e.hidden=!msg; e.textContent=msg||''; setTimeout(function(){ try{ $('#lgUser').focus(); }catch(x){} },50); }
-function unlockApp(){ document.body.classList.remove('locked'); $('#login').hidden=true; $('#lgPass').value=''; }
-function forceLogout(msg){ LS.set('sessao',null); lockApp(msg||'Sua sessão terminou. Entre de novo.'); }
+var desbloqueado=false;
+function lockApp(msg){ desbloqueado=false; document.body.classList.add('locked'); $('#login').hidden=false; $('#loginObra').textContent=cfg.obra||'RDO';
+  var s=sessao(), c=LS.get('cred'); if(s&&!$('#lgUser').value) $('#lgUser').value=s.usuario||''; $('#lgPass').value='';
+  var e=$('#lgErr'); e.hidden=!msg; e.textContent=msg||''; e.style.background=''; 
+  setTimeout(function(){ try{ ($('#lgUser').value? $('#lgPass') : $('#lgUser')).focus(); }catch(x){} },50); }
+function unlockApp(){ desbloqueado=true; document.body.classList.remove('locked'); $('#login').hidden=true; $('#lgPass').value=''; }
+function forceLogout(msg){ LS.set('sessao',null); LS.set('cred',null); lockApp(msg||'Sua sessão terminou. Entre de novo.'); }
+// senha guardada só como código PBKDF2 (para conferir sem internet)
+function hexOf(buf){ return Array.prototype.map.call(new Uint8Array(buf),function(b){ return ('0'+b.toString(16)).slice(-2); }).join(''); }
+async function derivar(senha, sal){
+  var k=await crypto.subtle.importKey('raw',new TextEncoder().encode(senha),'PBKDF2',false,['deriveBits']);
+  return hexOf(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:new TextEncoder().encode(sal),iterations:150000},k,256));
+}
+async function guardarCred(usuario, senha){ try{ var sal=hexOf(crypto.getRandomValues(new Uint8Array(16))); LS.set('cred',{u:usuario.toLowerCase(),sal:sal,h:await derivar(senha,sal)}); }catch(e){} }
+async function confereLocal(usuario, senha){ var c=LS.get('cred'); if(!c||c.u!==usuario.toLowerCase()) return false; try{ return (await derivar(senha,c.sal))===c.h; }catch(e){ return false; } }
+var tentativasLocais=0;
 function naoAutorizado(j){ if(j&&j.codigo==='nao_autorizado'){ forceLogout('Seu acesso expirou ou foi removido pelo responsável da obra. Entre de novo.'); return true; } return false; }
 async function doLogin(ev){
   ev.preventDefault();
   var u=$('#lgUser').value.trim(), p=$('#lgPass').value, btn=$('#lgBtn'), err=$('#lgErr');
   if(!u||!p){ err.hidden=false; err.textContent='Digite usuário e senha.'; return; }
-  if(!navigator.onLine){ err.hidden=false; err.textContent='Sem internet. Para entrar pela primeira vez, conecte-se a uma rede.'; return; }
   btn.disabled=true; btn.textContent='Entrando…'; err.hidden=true;
+  var s0=sessao();
+  // já entrou antes neste celular: confere a senha aqui mesmo (funciona sem internet) e checa o acesso na planilha
+  if(s0 && LS.get('cred') && String(s0.usuario).toLowerCase()===u.toLowerCase()){
+    if(tentativasLocais>=5){ err.hidden=false; err.textContent='Muitas tentativas erradas. Feche o app e tente de novo mais tarde.'; btn.disabled=false; btn.textContent='Entrar'; return; }
+    var okLocal=await confereLocal(u,p);
+    if(okLocal){ tentativasLocais=0; unlockApp(); toast('Bem-vindo, '+(s0.nome||u)+'!'); renderAll(); verificarSessao(); await gsQueuePending(); gsFlush(); btn.disabled=false; btn.textContent='Entrar'; return; }
+    if(!navigator.onLine){ tentativasLocais++; err.hidden=false; err.textContent='Senha incorreta.'; btn.disabled=false; btn.textContent='Entrar'; return; }
+    // senha diferente com internet: pode ter sido trocada pelo responsável, confere na planilha
+  }
+  if(!navigator.onLine){ err.hidden=false; err.textContent='Sem internet. Para entrar pela primeira vez neste celular, conecte-se a uma rede.'; btn.disabled=false; btn.textContent='Entrar'; return; }
   try{
     var res=await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'login',usuario:u,senha:p}),redirect:'follow'});
     var j=await res.json();
     if(!j.ok){ err.hidden=false; err.textContent=j.erro||'Usuário ou senha incorretos.'; return; }
     if(!j.token){ err.hidden=false; err.textContent='A planilha ainda está com o código antigo. O responsável precisa atualizar o script (versão com login) e publicar a nova versão.'; return; }
+    if(s0&&s0.token&&s0.token!==j.token){ try{ fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'sair',token:s0.token}),redirect:'follow'}); }catch(x){} }
     LS.set('sessao',{token:j.token,usuario:j.usuario,nome:j.nome,desde:Date.now()});
+    await guardarCred(j.usuario,p); tentativasLocais=0;
     unlockApp(); toast('Bem-vindo, '+j.nome+'!'); renderAll();
     await gsQueuePending(); gsFlush();
   }catch(e){ err.hidden=false; err.textContent='Não consegui falar com a planilha. Confira a internet e tente de novo.'; }
@@ -806,8 +829,14 @@ async function verificarSessao(){
 }
 async function sair(){
   var s=sessao(); if(s){ try{ await fetch(gsUrl(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({acao:'sair',token:s.token}),redirect:'follow'}); }catch(e){} }
-  LS.set('sessao',null); lockApp('');
+  LS.set('sessao',null); LS.set('cred',null); $('#lgUser').value=''; lockApp('');
 }
+// pede a senha de novo se o app ficou mais de 5 minutos em segundo plano
+var saiuEm=0;
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden){ saiuEm=Date.now(); if(cfgFormDirty) saveCfgFromForm(true); if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); } return; }
+  if(desbloqueado && saiuEm && Date.now()-saiuEm>5*60*1000) lockApp('Por segurança, confirme sua senha para continuar.');
+});
 $('#loginForm').addEventListener('submit',doLogin);
 $('#acSair').addEventListener('click',sair);
 
@@ -1021,7 +1050,7 @@ $('#genBtn').addEventListener('click',function(){ if(saveTimer){ clearTimeout(sa
 document.addEventListener('visibilitychange',function(){ if(document.hidden&&saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); } });
 
 // ---------- boot ----------
-var APP_VERSION=10;
+var APP_VERSION=11;
 if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{ r.update(); }catch(e){} }).catch(function(){}); }); }
 async function forceUpdate(){
   var b=$('#updBtn'); if(b){ b.disabled=true; b.textContent='Atualizando…'; }
@@ -1040,7 +1069,7 @@ document.addEventListener('visibilitychange',function(){ if(!document.hidden) ch
 setTimeout(checkVersion,1500);
 try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 (async function boot(){
-  if(sessao()) unlockApp(); else lockApp('');
+  lockApp(sessao()? 'Confirme sua senha para entrar.' : '');
   var c=LS.get('config'); if(c) cfg=Object.assign(clone(DEFAULT_CFG),c);
   rdo=normRdo(LS.get('d:'+todayISO()),todayISO()); renderAll(); setSync('conectando…');
   var cl=window.claude;
@@ -1052,7 +1081,7 @@ try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(
   var rc=await Store.getConfig(); if(rc) cfg=Object.assign(clone(DEFAULT_CFG),rc);
   rdo=normRdo(await Store.getRdo(rdo.data),rdo.data);
   renderAll(); setSync('salvo no celular');
-  if(!sessao()) lockApp(''); else { verificarSessao(); await gsQueuePending(); gsFlush(); }
+  if(sessao()){ verificarSessao(); await gsQueuePending(); gsFlush(); }
 })();
 })();
 </script>
