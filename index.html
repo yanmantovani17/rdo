@@ -48,6 +48,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 .brand h1{font-family:var(--f-display);font-weight:700;font-size:1.15rem;letter-spacing:.06em;text-transform:uppercase;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brand small{display:block;font-family:var(--f-body);font-weight:500;font-size:.72rem;letter-spacing:.08em;opacity:.7}
 .sync{font-size:.75rem;opacity:.8;white-space:nowrap}
+.brand h1{flex:1;min-width:0}
+.hdr-save{flex:none;background:var(--signal);color:var(--signal-ink);border:0;border-radius:8px;padding:8px 14px;min-height:38px;font-family:var(--f-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.95rem;cursor:pointer}
+.hdr-save.ok{background:var(--ok);color:#fff}
+.hdr-save:disabled{opacity:.7}
+@media (max-width:480px){ .brand .sync{display:none} .brand h1{font-size:1.05rem} }
 .daybar{display:flex;align-items:center;gap:6px}
 .daybar button{background:transparent;border:1px solid rgba(255,255,255,.25);color:inherit;border-radius:8px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}
 .daybox{flex:1;min-width:0;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.08);border-radius:8px;padding:4px 10px;height:40px}
@@ -217,6 +222,7 @@ body.locked > *:not(#login):not(script){display:none!important}
   <div class="top-in">
     <div class="brand">
       <h1 id="obraName">RDO<small>Relatório Diário de Obra</small></h1>
+      <button type="button" id="hdrSave" class="hdr-save" aria-label="Salvar">Salvar</button>
       <span class="sync" id="sync">carregando…</span>
     </div>
     <div class="daybar" id="daybar">
@@ -312,7 +318,7 @@ body.locked > *:not(#login):not(script){display:none!important}
   <h2 class="sheet-h">Backup</h2>
   <p class="note">Os RDOs ficam guardados neste celular. Faça um backup de vez em quando (as fotos não entram no backup).</p>
   <div class="backup"><button type="button" class="btn" id="expBk">Exportar backup</button><label class="btn">Importar backup<input type="file" id="impBk" accept="application/json,.json" hidden></label></div>
-  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 9</p>
+  <p class="note" id="appVer" style="text-align:center;margin-top:8px">Versão do app: 10</p>
 </main>
 
 <div class="bar" id="bar">
@@ -939,15 +945,38 @@ function renderCfg(){
     for(var i=0;i<4;i++){ var p=arr[i]||{}; html+='<input type="text" id="c-'+k+'-n'+i+'" placeholder="Nome" value="'+h(p.nome||'')+'"><input type="text" id="c-'+k+'-f'+i+'" placeholder="Função" value="'+h(p.funcao||'')+'">'; }
     $('#c-'+k).innerHTML=html; });
 }
-$('#saveCfg').addEventListener('click',async function(){
+var cfgFormDirty=false, cfgTimer=null;
+async function saveCfgFromForm(quiet){
+  if(!$('#c-obra')) return;
   function lines(id,max){ return $(id).value.split('\n').map(function(s){return s.trim();}).filter(Boolean).slice(0,max); }
   function people(k){ var a=[]; for(var i=0;i<4;i++){ var n=$('#c-'+k+'-n'+i).value.trim(), f=$('#c-'+k+'-f'+i).value.trim(); if(n||f) a.push({nome:n,funcao:f}); } return a; }
   cfg.obra=$('#c-obra').value.trim(); cfg.inicio=$('#c-inicio').value; cfg.termino=$('#c-termino').value;
   cfg.empresas=lines('#c-empresas',G.LIMITS.empresas); cfg.equipamentos=lines('#c-equip',G.LIMITS.equipamentos); cfg.funcoesExtras=lines('#c-fextra',G.LIMITS.extrasRec);
   cfg.elaboracao=people('elab'); cfg.recebimento=people('receb');
-  try{ await Store.saveConfig(cfg); toast('Dados da obra salvos.'); }catch(e){ toast('Salvo neste aparelho. Não consegui salvar na nuvem.'); }
+  try{ await Store.saveConfig(cfg); }catch(e){}
+  cfgFormDirty=false; clearTimeout(cfgTimer);
+  if(!quiet) toast('Dados da obra salvos.');
   updateHeader(); renderAll();
+}
+$('#saveCfg').addEventListener('click',function(){ saveCfgFromForm(false); });
+// autosave while typing in the Obra form
+['#c-obra','#c-inicio','#c-termino','#c-empresas','#c-equip','#c-fextra','#c-elab','#c-receb'].forEach(function(sel){
+  var el=$(sel); if(!el) return;
+  ['input','change'].forEach(function(ev){ el.addEventListener(ev,function(){ cfgFormDirty=true; setSync('alterações não salvas…'); clearTimeout(cfgTimer); cfgTimer=setTimeout(function(){ saveCfgFromForm(true).then(function(){ setSync('salvo no celular'); }); },800); }); });
 });
+// header save button: saves whatever is on screen
+async function salvarTudo(){
+  var b=$('#hdrSave'); b.disabled=true;
+  try{
+    if(!$('#view-obra').hidden || cfgFormDirty) await saveCfgFromForm(true);
+    clearTimeout(saveTimer); saveTimer=null; rdo.updatedAt=Date.now(); await doSave();
+    if(navigator.onLine){ await gsQueuePending(); gsFlush(); }
+    b.textContent='Salvo ✓'; b.classList.add('ok'); toast(!$('#view-obra').hidden? 'Dados da obra salvos.' : 'RDO de '+br(rdo.data)+' salvo'+(navigator.onLine?' e enviado para a planilha.':'. Envia para a planilha quando tiver internet.'));
+    setTimeout(function(){ b.textContent='Salvar'; b.classList.remove('ok'); },1800);
+  }catch(e){ toast('Não consegui salvar. Tente de novo.'); }
+  finally{ b.disabled=false; }
+}
+$('#hdrSave').addEventListener('click',salvarTudo);
 
 function renderCad(){
   [['servicos','#cadServ','Nenhum serviço cadastrado.'],['unidades','#cadUnid','Nenhuma unidade cadastrada.']].forEach(function(c){
@@ -976,7 +1005,7 @@ document.addEventListener('visibilitychange',function(){ if(!document.hidden) gs
 $('#impBk').addEventListener('change',function(e){ importBackup(e.target.files[0]); });
 
 // ---------- navigation ----------
-function showView(v){ ['dia','hist','obra'].forEach(function(x){ $('#view-'+x).hidden=x!==v; $('#tab-'+x).setAttribute('aria-selected',String(x===v)); });
+function showView(v){ if(cfgFormDirty){ saveCfgFromForm(true); } ['dia','hist','obra'].forEach(function(x){ $('#view-'+x).hidden=x!==v; $('#tab-'+x).setAttribute('aria-selected',String(x===v)); });
   $('#bar').hidden=v!=='dia'; $('#daybar').hidden=v!=='dia'; if(v==='hist') renderHist(); if(v==='obra'){ renderCfg(); renderCad(); $('#gsUrl').value=gsUrl(); ntRender(); var ss=sessao(); $('#acNome').textContent= ss? (ss.nome+' ('+ss.usuario+')') : '—'; }
   if(v==='hist') gsShow(); window.scrollTo(0,0); }
 $$('.tabs button').forEach(function(b){ b.addEventListener('click',function(){ showView(b.dataset.view); }); });
@@ -992,7 +1021,7 @@ $('#genBtn').addEventListener('click',function(){ if(saveTimer){ clearTimeout(sa
 document.addEventListener('visibilitychange',function(){ if(document.hidden&&saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); } });
 
 // ---------- boot ----------
-var APP_VERSION=9;
+var APP_VERSION=10;
 if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('sw.js').then(function(r){ try{ r.update(); }catch(e){} }).catch(function(){}); }); }
 async function forceUpdate(){
   var b=$('#updBtn'); if(b){ b.disabled=true; b.textContent='Atualizando…'; }
