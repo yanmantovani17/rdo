@@ -200,6 +200,26 @@ textarea{resize:vertical;min-height:76px}
 .bar .btn.cam input{display:none}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--asphalt);color:var(--asphalt-ink);padding:10px 16px;border-radius:8px;z-index:60;max-width:calc(100% - 32px);font-size:.92rem;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 body:has(.ov:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 12px)}
+.resumo{margin:0;font-size:.9rem;color:var(--muted)} .resumo b{color:var(--ink);font-family:var(--f-mono)} .resumo b.u{color:var(--red)}
+.addambs{margin-top:-4px}
+.amb{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px 12px;display:flex;flex-direction:column;gap:10px}
+.amb-h{display:flex;gap:8px;align-items:center}
+.amb-t{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:1px;background:none;border:0;padding:4px 0;text-align:left;cursor:pointer;color:inherit}
+.amb-t b{font-family:var(--f-display);font-weight:700;font-size:1.2rem;letter-spacing:.04em;text-transform:uppercase;line-height:1.1}
+.amb-t span{font-size:.82rem;color:var(--muted)}
+.ab{flex:none;width:52px;height:48px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);font-size:1.35rem;cursor:pointer;color:inherit}
+.ab.pri{background:var(--signal);border-color:var(--signal);color:var(--signal-ink);font-weight:700;font-size:1.6rem}
+.amb .thumbs .th{width:64px;height:64px}
+.irow{display:flex;gap:10px;align-items:center;background:var(--surface-2);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;text-align:left;width:100%;color:inherit}
+.irow.p-U{border-left-color:var(--red)} .irow.p-A{border-left-color:var(--warn)} .irow.p-M{border-left-color:var(--signal)} .irow.p-B{border-left-color:var(--ok)}
+.irow .mini{width:48px;height:48px;border-radius:6px;background:var(--surface) center/cover no-repeat;border:1px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;opacity:.9}
+.irow .grow{min-width:0;display:flex;flex-direction:column;gap:3px}
+.irow .tt{font-weight:600;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.irow .meta{font-size:.8rem;color:var(--muted)}
+.irow .chev{color:var(--muted);font-size:1.3rem;flex:none}
+.falta{color:var(--warn);font-weight:600}
+.qrow{display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:8px}
+.qrow input{font-family:var(--f-mono);font-size:1.1rem}
 .msg{font-size:.9rem;border-radius:8px;padding:10px 12px;background:var(--ok-soft);color:var(--ink)}
 .msg.err{background:var(--warn-soft)}
 #cfmBack{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;padding:16px}
@@ -240,11 +260,9 @@ body:has(.ov:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inset-top,
       <button role="tab" aria-selected="false" data-main="cfg">Empresa e app</button>
     </nav>
     <nav class="tabs" role="tablist" id="tabsLev" hidden>
-      <button role="tab" data-tab="dados">Dados</button>
-      <button role="tab" data-tab="amb">Ambientes<span class="cnt" id="cntAmb"></span></button>
-      <button role="tab" data-tab="itens">Itens<span class="cnt" id="cntIt"></span></button>
+      <button role="tab" data-tab="vis">Vistoria<span class="cnt" id="cntIt"></span></button>
       <button role="tab" data-tab="ck">Checklist<span class="cnt" id="cntCk"></span></button>
-      <button role="tab" data-tab="fim">Fechar</button>
+      <button role="tab" data-tab="rel">Relatório</button>
     </nav>
     <div style="height:8px" id="subGap" hidden></div>
   </div>
@@ -275,6 +293,23 @@ body:has(.ov:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inset-top,
     <p class="note" id="phInfo"></p>
   </div>
 </div>
+
+<!-- novo levantamento -->
+<div class="ov" id="novoOv" hidden>
+  <div class="ov-box">
+    <h2>Novo levantamento</h2>
+    <label class="field"><span class="lbl">Obra</span><input type="text" id="nvTitulo" placeholder="Ex.: Reforma casa R. da Esperança, 1022"></label>
+    <label class="field"><span class="lbl">Cliente (opcional)</span><input type="text" id="nvCliente"></label>
+    <label class="field"><span class="lbl">Endereço (opcional)</span><input type="text" id="nvEnd"></label>
+    <label class="row" style="gap:10px;font-size:.92rem"><input type="checkbox" id="nvGps" checked style="width:22px;height:22px">Marcar a localização da obra agora</label>
+    <button type="button" class="btn pri full" id="nvOk">Começar</button>
+    <button type="button" class="btn full" id="nvCancel">Cancelar</button>
+    <p class="note">O resto dos dados da visita fica na aba Relatório e pode ser preenchido depois.</p>
+  </div>
+</div>
+
+<!-- ambiente -->
+<div class="ov" id="ambOv" hidden><div class="ov-box" id="ambBox"></div></div>
 
 <!-- câmera ou galeria -->
 <div class="ov" id="camOv" hidden>

@@ -2,7 +2,7 @@
 // Gera o relatório fotográfico (PDF), a planilha de orçamento/levantamento (Excel) e as fotos numeradas (ZIP).
 (function(){
 'use strict';
-var APP_VER = 3;   // troque junto com version.json a cada publicação
+var APP_VER = 4;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -47,7 +47,7 @@ function tipoNome(id){ var p=TIPO.find(function(x){ return x.id===id; }); return
 
 var DEFAULT_CFG={empresa:'', resp:'', crea:'', tel:'', email:'', seq:0, fotoPdf:'normal'};
 var cfg=Object.assign({},DEFAULT_CFG);
-var levs=[], cur=null, tab='dados', curItem=null, view='lista';
+var levs=[], cur=null, tab='vis', curItem=null, view='lista';
 function saveCfg(){ LS.set('cfg',cfg); }
 
 // ---------- modelo de dados ----------
@@ -114,30 +114,27 @@ function setSub(){ if(!cur) return;
   if(view==='item'&&curItem){ $('#subTitle').textContent='Item #'+pad2(curItem.n)+(curItem.serv? ' · '+curItem.serv : ''); $('#subMeta').textContent=ambNome(cur,curItem.amb)+' · '+(cur.titulo||'Levantamento'); $('#subNum').hidden=true; return; }
   $('#subTitle').textContent=cur.titulo||'Novo levantamento'; $('#subMeta').textContent=[br(cur.data), cur.cliente].filter(Boolean).join(' · ');
   $('#subNum').hidden=false; $('#subNum').textContent='Nº '+String(cur.n).padStart(3,'0');
-  $('#cntAmb').textContent=(cur.ambs||[]).length; $('#cntIt').textContent=(cur.itens||[]).length; $('#cntCk').textContent=ckRespondidos(cur)+'/'+ckTodos(cur).length; }
+  $('#cntIt').textContent=(cur.itens||[]).length; $('#cntCk').textContent=ckRespondidos(cur)+'/'+ckTodos(cur).length; }
 $$('#tabsMain button').forEach(function(b){ b.addEventListener('click',function(){ showView(b.dataset.main); }); });
 $$('#tabsLev button').forEach(function(b){ b.addEventListener('click',function(){ tab=b.dataset.tab; renderLev(); renderBar(); window.scrollTo(0,0); }); });
 $('#backBtn').addEventListener('click',function(){ if(history.state&&history.state.lev) history.back(); else voltar(); });
 window.addEventListener('popstate',function(){ voltar(); });
-function voltar(){ flush(); if(view==='item'){ curItem=null; tab='itens'; showView('lev'); } else if(view==='lev'){ cur=null; showView('lista'); } }
-function abrirLev(id, t){ var l=levs.find(function(x){ return x.id===id; }); if(!l) return; cur=l; tab=t||'dados'; pushNav(); showView('lev'); }
-function abrirItem(it){ curItem=it; pushNav(); showView('item'); }
+function voltar(){ flush(); if(view==='item'){ var y=cur&&cur._scrollVis; curItem=null; tab='vis'; showView('lev'); if(y) window.scrollTo(0,y); } else if(view==='lev'){ cur=null; showView('lista'); } }
+function abrirLev(id, t){ var l=levs.find(function(x){ return x.id===id; }); if(!l) return; cur=l; tab=t||'vis'; pushNav(); showView('lev'); }
+function abrirItem(it){ if(view==='lev'&&tab==='vis'&&cur) cur._scrollVis=window.scrollY; curItem=it; pushNav(); showView('item'); }
 
 // ---------- barra inferior ----------
 function renderBar(){ var b=$('#barIn'), html='';
-  if(view==='lista') html='<button type="button" class="btn pri" data-act="novoLev">+ Novo levantamento</button>';
-  else if(view==='cfg') html='<button type="button" class="btn pri" data-act="novoLev">+ Novo levantamento</button>';
+  if(view==='lista'||view==='cfg') html='<button type="button" class="btn pri" data-act="novoLev">+ Novo levantamento</button>';
   else if(view==='lev'){
-    if(tab==='amb') html='<button type="button" class="btn dark" data-act="novoAmb">+ Ambiente</button><button type="button" class="btn pri" data-act="novoItem">+ Item</button>';
-    else if(tab==='fim') html='<button type="button" class="btn pri" data-act="pdf">Gerar relatório fotográfico (PDF)</button>';
-    else html='<button type="button" class="btn cam" data-cam="quick" aria-label="Foto rápida (vira um item novo)">📷</button><button type="button" class="btn pri" data-act="novoItem">+ Item</button>';
-  } else if(view==='item') html='<button type="button" class="btn cam" data-cam="i" aria-label="Adicionar foto">📷</button><button type="button" class="btn dark" data-act="outroItem">+ Outro item</button><button type="button" class="btn pri" data-act="pronto">Pronto</button>';
-  b.innerHTML=html; }
+    html='<button type="button" class="btn dark" data-act="novoAmb">+ Ambiente</button><button type="button" class="btn pri" data-cam="quick">📷 Foto</button>';
+  } else if(view==='item') html='<button type="button" class="btn cam" data-cam="i" aria-label="Adicionar foto">📷</button><button type="button" class="btn dark" data-act="outroItem">+ Próximo</button><button type="button" class="btn pri" data-act="pronto">Pronto ✓</button>';
+  b.innerHTML=html; $('#bar').hidden=(view==='lev'&&tab==='rel'); }
 document.addEventListener('click',function(e){ var a=e.target.closest('[data-act]'); if(!a) return; var act=a.dataset.act;
-  if(act==='novoLev'){ var l=novoLev(); levs.push(l); cur=l; persist(l); tab='dados'; pushNav(); showView('lev'); toast('Levantamento Nº '+String(l.n).padStart(3,'0')+' aberto. Comece pelos dados da visita.'); }
-  else if(act==='novoAmb'){ addAmb(''); }
-  else if(act==='novoItem'){ var amb=a.dataset.amb||''; criarItem(amb); }
-  else if(act==='outroItem'){ var ant=curItem; flush(); var it=novoItem(cur, ant? ant.amb : '', ant? ant.disc : ''); cur.itens.push(it); touch(); curItem=it; renderItem(); renderBar(); window.scrollTo(0,0); toast('Item #'+pad2(it.n)+' no mesmo ambiente.'); }
+  if(act==='novoLev'){ abrirNovo(); }
+  else if(act==='novoAmb'){ var n=prompt('Nome do ambiente (ex.: Sala, Banheiro social, Fachada)'); if(n&&n.trim()) addAmb(n.trim()); }
+  else if(act==='novoItem'){ var amb=a.dataset.amb!=null? a.dataset.amb : (cur.lastAmb||''); cur.lastAmb=amb; criarItem(amb); }
+  else if(act==='outroItem'){ var ant=curItem; flush(); var it=novoItem(cur, ant? ant.amb : '', ant? ant.disc : ''); cur.itens.push(it); touch(); curItem=it; renderItem(); renderBar(); window.scrollTo(0,0); toast('Item #'+pad2(it.n)+' em '+ambNome(cur,it.amb)+'.'); }
   else if(act==='pronto'){ if(history.state&&history.state.lev) history.back(); else voltar(); }
   else if(act==='pdf'){ gerarPDF(a); }
 });
@@ -157,87 +154,77 @@ function renderLista(){ var el=$('#view-lista');
 function capaId(l){ if(l.capa&&existeFoto(l,l.capa)) return l.capa; var f=fotosNumeradas(l).list[0]; return f? f.id : null; }
 function existeFoto(l,id){ return fotosNumeradas(l).map[id]!=null; }
 async function loadCapas(root){ var els=$$('[data-capa]',root); for(var i=0;i<els.length;i++){ var k=els[i].dataset.capa; if(!k) continue; var u=await blobURL(k); if(u) els[i].style.backgroundImage='url("'+u+'")'; } }
-$('#view-lista').addEventListener('click',function(e){ var b=e.target.closest('[data-open]'); if(b) abrirLev(b.dataset.open, 'itens'); });
+$('#view-lista').addEventListener('click',function(e){ var b=e.target.closest('[data-open]'); if(b) abrirLev(b.dataset.open, 'vis'); });
 
-// ---------- LEVANTAMENTO (abas) ----------
+// ---------- LEVANTAMENTO (abas: Vistoria · Checklist · Relatório) ----------
 var TIPOS_SERV=['Reforma','Manutenção','Vistoria técnica','Orçamento','Obra nova','Laudo / patologia'];
 var CLIMAS=['Ensolarado','Nublado','Chuvoso','Garoa'];
 var IMOVEIS=['Casa térrea','Sobrado','Apartamento','Comercial','Galpão','Terreno'];
 var AMB_SUG=['Fachada','Sala','Cozinha','Banheiro','Quarto 1','Quarto 2','Área de serviço','Varanda','Garagem','Corredor','Escada','Laje / terraço','Telhado','Área externa','Muro'];
-function renderLev(){ if(!cur) return; setSub(); $$('#tabsLev button').forEach(function(b){ b.setAttribute('aria-selected', String(b.dataset.tab===tab)); });
+function renderLev(){ if(!cur) return; if(['vis','ck','rel'].indexOf(tab)<0) tab='vis'; setSub(); $$('#tabsLev button').forEach(function(b){ b.setAttribute('aria-selected', String(b.dataset.tab===tab)); });
   var el=$('#view-lev');
-  if(tab==='dados') el.innerHTML=htmlDados();
-  else if(tab==='amb') el.innerHTML=htmlAmbs();
-  else if(tab==='itens') el.innerHTML=htmlItens();
-  else if(tab==='ck') el.innerHTML=htmlCk();
-  else el.innerHTML=htmlFim();
-  loadThumbs(el); loadCapas(el); if(tab==='fim') loadSigs(); }
+  if(tab==='vis') el.innerHTML=htmlVis(); else if(tab==='ck') el.innerHTML=htmlCk(); else el.innerHTML=htmlRel();
+  loadThumbs(el); loadCapas(el); if(tab==='rel') loadSigs(); }
 function inp(k, val, ph, extra){ return '<input type="text" data-k="'+k+'" value="'+h(val)+'"'+(ph?' placeholder="'+h(ph)+'"':'')+(extra||'')+'>'; }
 function fld(lbl, inner){ return '<label class="field"><span class="lbl">'+lbl+'</span>'+inner+'</label>'; }
 function ta(k, val, ph, rows){ return '<textarea data-k="'+k+'" rows="'+(rows||3)+'"'+(ph?' placeholder="'+h(ph)+'"':'')+'>'+h(val)+'</textarea>'; }
 function chipsK(k, list, val){ return '<div class="chips">'+list.map(function(o){ return '<button type="button" class="chip" data-chip="'+k+'" data-v="'+h(o)+'" aria-pressed="'+(val===o)+'">'+h(o)+'</button>'; }).join('')+'</div>'; }
-function thumbsHTML(list, owner, nmap){ return '<div class="thumbs" data-thumbs="'+owner+'">'+(list||[]).map(function(p){ var n=nmap&&nmap[p.id];
+function thumbsHTML(list, owner, nmap, semBotao){ return '<div class="thumbs" data-thumbs="'+owner+'">'+(list||[]).map(function(p){ var n=nmap&&nmap[p.id];
     return '<button type="button" class="th" data-ph="'+p.id+'" data-owner="'+owner+'" aria-label="Foto '+(n||'')+'">'+(n?'<span class="num">F'+pad2(n)+'</span>':'')+(p.leg?'<span class="lg" title="Com legenda"></span>':'')+'</button>'; }).join('')+
-  '<button type="button" class="addph cam" data-cam="'+owner+'"><span class="ico">📷</span>Foto</button></div>'; }
-
-function htmlDados(){ var l=cur, nmap=fotosNumeradas(l).map;
-  var gps=l.gps? '<a class="btn sm" target="_blank" rel="noopener" href="https://maps.google.com/?q='+l.gps.lat+','+l.gps.lng+'">Ver no mapa ('+fmt(l.gps.lat,5)+', '+fmt(l.gps.lng,5)+')</a>' : '';
-  return '<h2 class="sheet-h">Dados da visita</h2>'+
-  '<div class="card pad">'+
-    fld('Obra / título do levantamento', inp('titulo', l.titulo, 'Ex.: Reforma casa R. da Esperança, 1022'))+
-    '<div class="grid2">'+fld('Cliente', inp('cliente', l.cliente))+fld('Contato do cliente', inp('contato', l.contato, 'Telefone / e-mail', ' inputmode="tel"'))+'</div>'+
-    fld('Endereço', inp('endereco', l.endereco, 'Rua, nº, bairro, cidade'))+
-    '<div class="row"><button type="button" class="btn sm dark" data-gps>📍 Marcar localização (GPS)</button>'+gps+'</div>'+
-    '<div class="field"><span class="lbl">Tipo de serviço</span>'+chipsK('tipoServ', TIPOS_SERV, l.tipoServ)+'</div>'+
-    '<div class="grid3">'+fld('Data', '<input type="date" data-k="data" value="'+h(l.data)+'">')+fld('Chegada', '<input type="time" data-k="hIni" value="'+h(l.hIni)+'">')+fld('Saída', '<input type="time" data-k="hFim" value="'+h(l.hFim)+'">')+'</div>'+
-    '<div class="field"><span class="lbl">Clima na visita</span>'+chipsK('clima', CLIMAS, l.clima)+'</div>'+
-    '<div class="field"><span class="lbl">Choveu nas últimas 48 h? (importante para infiltração)</span>'+chipsK('chuva48', ['Sim','Não','Não sei'], l.chuva48)+'</div>'+
-    '<div class="grid2">'+fld('Responsável técnico', inp('resp', l.resp))+fld('CREA / CAU', inp('crea', l.crea))+'</div>'+
-    fld('Quem acompanhou a visita', inp('acomp', l.acomp, 'Nome e função (cliente, síndico, zelador…)'))+
-  '</div>'+
-  '<h2 class="sheet-h">Imóvel</h2>'+
-  '<div class="card pad">'+
-    '<div class="field"><span class="lbl">Tipo de imóvel</span>'+chipsK('imovel', IMOVEIS, l.imovel)+'</div>'+
-    '<div class="grid3">'+fld('Idade (anos)', inp('idade', l.idade, '', ' inputmode="decimal"'))+fld('Pavimentos', inp('pavs', l.pavs, '', ' inputmode="decimal"'))+fld('Área constr. (m²)', inp('area', l.area, '', ' inputmode="decimal"'))+'</div>'+
-    '<div class="field"><span class="lbl">Imóvel ocupado durante a obra?</span>'+chipsK('ocupado', ['Sim','Não','Parcialmente'], l.ocupado)+'</div>'+
-    fld('O que o cliente pediu (escopo / objetivo)', ta('objetivo', l.objetivo, 'Ex.: resolver infiltração no banheiro, trocar piso da sala e pintar a casa toda', 4))+
-  '</div>'+
-  '<h2 class="sheet-h">Fotos gerais</h2><p class="note">Fachada, entorno, acesso, medidores. Toque numa foto para pôr legenda, marcar o defeito ou escolher a capa do relatório.</p>'+
-  '<div class="card pad">'+thumbsHTML(l.fotos,'lev',nmap)+'</div>'+
-  '<button type="button" class="btn danger full" data-dellev>Apagar este levantamento</button>'; }
-
-function htmlAmbs(){ var l=cur, nmap=fotosNumeradas(l).map;
-  var html='<h2 class="sheet-h">Ambientes</h2><p class="note">Cadastre cada cômodo ou área com as medidas. O app calcula piso, paredes e teto, e os itens podem puxar essas áreas direto para a quantidade.</p>'+
-    '<div class="field"><span class="lbl">Adicionar rápido</span><div class="chips scroll">'+AMB_SUG.map(function(s){ return '<button type="button" class="chip" data-addamb="'+h(s)+'">+ '+h(s)+'</button>'; }).join('')+'</div></div>';
-  if(!l.ambs.length) html+='<div class="empty"><b>Nenhum ambiente</b>Use os botões acima ou “+ Ambiente”. Se preferir, pode lançar itens direto como “Geral”.</div>';
-  html+=l.ambs.map(function(a,i){ var c=ambCalc(a), nIt=l.itens.filter(function(it){ return it.amb===a.id; }).length;
-    return '<details class="card" data-amb="'+a.id+'"'+(a._open?' open':'')+'><summary><span class="chev">›</span><h2>'+h(a.nome||'Ambiente '+(i+1))+'</h2><span class="sum">'+(isNaN(c.piso)?'sem medidas':fmt(c.piso)+' m²')+' · '+nIt+' itens · '+(a.fotos||[]).length+' 📷</span></summary><div class="body">'+
-      '<div class="grid2">'+fld('Nome', '<input type="text" data-a="nome" value="'+h(a.nome)+'">')+fld('Pavimento', '<input type="text" data-a="pav" value="'+h(a.pav)+'" placeholder="Térreo, 1º…">')+'</div>'+
-      '<div class="grid4">'+fld('Compr. (m)', '<input type="text" inputmode="decimal" data-a="c" value="'+h(a.c)+'">')+fld('Larg. (m)', '<input type="text" inputmode="decimal" data-a="l" value="'+h(a.l)+'">')+fld('Pé-dir. (m)', '<input type="text" inputmode="decimal" data-a="pd" value="'+h(a.pd)+'">')+fld('Vãos (m²)', '<input type="text" inputmode="decimal" data-a="vaos" value="'+h(a.vaos)+'" placeholder="portas+jan.">')+'</div>'+
-      '<div class="calc" data-calc="'+a.id+'">'+calcHTML(c)+'</div>'+
-      fld('Observações do ambiente', '<textarea data-a="obs" rows="3" placeholder="Estado geral, acabamentos existentes, o que chamou atenção">'+h(a.obs)+'</textarea>')+
-      '<div class="field"><span class="lbl">Fotos do ambiente</span>'+thumbsHTML(a.fotos,'a:'+a.id,nmap)+'</div>'+
-      '<div class="row"><button type="button" class="btn pri grow" data-act="novoItem" data-amb="'+a.id+'">+ Item neste ambiente</button>'+(nIt?'<button type="button" class="btn grow" data-veramb="'+a.id+'">Ver '+nIt+' itens</button>':'')+'</div>'+
-      '<div class="row"><button type="button" class="btn sm" data-moveamb="'+a.id+'" data-dir="-1" '+(i===0?'disabled':'')+'>↑ Subir</button><button type="button" class="btn sm" data-moveamb="'+a.id+'" data-dir="1" '+(i===l.ambs.length-1?'disabled':'')+'>↓ Descer</button><span class="grow"></span><button type="button" class="btn sm danger" data-delamb="'+a.id+'">Apagar ambiente</button></div>'+
-    '</div></details>'; }).join('');
+  (semBotao?'':'<button type="button" class="addph cam" data-cam="'+owner+'"><span class="ico">📷</span>Foto</button>')+'</div>'; }
+function itemRow(it){ var q=qtdItem(it), f0=(it.fotos||[])[0];
+  return '<button type="button" class="irow p-'+it.prio+'" data-item="'+it.id+'"><span class="mini"'+(f0?' data-capa="'+f0.id+'"':'')+'>'+(f0?'':'📷')+'</span><span class="grow"><span class="tt">'+h(it.serv||it.desc||'Item sem descrição')+'</span>'+
+    '<span class="meta"><span class="badge p-'+it.prio+'">'+prioNome(it.prio)+'</span> '+(isNaN(q)?'<span class="falta">sem quantidade</span>':fmtQ(q)+' '+h(it.und))+' · '+(it.fotos||[]).length+' foto'+((it.fotos||[]).length===1?'':'s')+'</span></span><span class="chev">›</span></button>'; }
+function htmlVis(){ var l=cur, its=itensOrdenados(l), nmap=fotosNumeradas(l).map, nU=its.filter(function(i){ return i.prio==='U'; }).length;
+  var html='<p class="resumo"><b>'+l.ambs.length+'</b> ambientes · <b>'+its.length+'</b> itens'+(nU?' · <b class="u">'+nU+' urgente'+(nU>1?'s':'')+'</b>':'')+' · <b>'+contaFotos(l)+'</b> fotos</p>';
+  if(!l.ambs.length) html+='<div class="empty"><b>Por onde começar</b>Toque no cômodo onde você está. Depois, em cada cômodo, use 📷 para fotografar um problema ou + para escrever o que precisa ser feito.</div>';
+  html+='<div class="chips scroll addambs">'+AMB_SUG.filter(function(s){ return !l.ambs.some(function(a){ return a.nome===s; }); }).map(function(s){ return '<button type="button" class="chip" data-addamb="'+h(s)+'">+ '+h(s)+'</button>'; }).join('')+'<button type="button" class="chip" data-act="novoAmb">+ Outro…</button></div>';
+  l.ambs.forEach(function(a){ var c=ambCalc(a), li=its.filter(function(it){ return it.amb===a.id; });
+    html+='<section class="amb" data-ambsec="'+a.id+'"><div class="amb-h"><button type="button" class="amb-t" data-editamb="'+a.id+'"><b>'+h(a.nome||'Ambiente')+'</b><span>'+(isNaN(c.piso)?'<span class="falta">✎ pôr medidas</span>':fmt(c.piso)+' m²'+(isNaN(c.paredes)?'':' · paredes '+fmt(c.paredes)+' m²')+' ✎')+'</span></button>'+
+      '<button type="button" class="ab" data-cam="quick:'+a.id+'" aria-label="Foto de um problema em '+h(a.nome)+'">📷</button><button type="button" class="ab pri" data-act="novoItem" data-amb="'+a.id+'" aria-label="Novo item em '+h(a.nome)+'">+</button></div>'+
+      ((a.fotos||[]).length? thumbsHTML(a.fotos,'a:'+a.id,nmap,true) : '')+
+      (li.length? '<div class="list">'+li.map(itemRow).join('')+'</div>' : '<p class="note">Nenhum item. 📷 fotografa um problema, + escreve um serviço.</p>')+'</section>'; });
+  var soltos=its.filter(function(it){ return !ambById(l,it.amb); });
+  html+='<section class="amb"><div class="amb-h"><div class="amb-t"><b>Geral / fachada</b><span>Fotos gerais e itens sem cômodo</span></div><button type="button" class="ab pri" data-act="novoItem" data-amb="" aria-label="Novo item geral">+</button></div>'+
+    thumbsHTML(l.fotos,'lev',nmap)+(soltos.length? '<div class="list">'+soltos.map(itemRow).join('')+'</div>' : '')+'</section>';
   return html; }
 function calcHTML(c){ if(isNaN(c.piso)) return '<span>Informe comprimento e largura para calcular as áreas.</span>';
   return '<span>Piso <b>'+fmt(c.piso)+' m²</b></span><span>Perímetro <b>'+fmt(c.perim)+' m</b></span>'+(isNaN(c.paredes)?'<span>Paredes: falta o pé-direito</span>':'<span>Paredes <b>'+fmt(c.paredes)+' m²</b></span><span>Volume <b>'+fmt(c.vol)+' m³</b></span>'); }
-
-var filtroIt='';
-function htmlItens(){ var l=cur, its=itensOrdenados(l), nmap=fotosNumeradas(l).map;
-  var cU=0,cA=0; its.forEach(function(it){ if(it.prio==='U') cU++; if(it.prio==='A') cA++; });
-  var html='<div class="tiles"><div class="tile f"><b>'+its.length+'</b><span>Itens</span></div><div class="tile u"><b>'+cU+'</b><span>Urgentes</span></div><div class="tile a"><b>'+cA+'</b><span>Alta</span></div><div class="tile k"><b>'+contaFotos(l)+'</b><span>Fotos</span></div></div>';
-  if(its.length>3) html+='<input type="search" id="qIt" placeholder="Buscar serviço, disciplina, ambiente" value="'+h(filtroIt)+'">';
-  if(!its.length){ html+='<div class="empty"><b>Nenhum item ainda</b>Cada item é uma coisa a fazer: o que encontrou, o serviço, como fazer, a quantidade e as fotos. Toque em “+ Item” ou em 📷 para começar por uma foto.</div>'; return html; }
-  var q=norm(filtroIt), grupos=[], gmap={};
-  its.forEach(function(it){ if(q && norm([it.serv,it.desc,discNome(it.disc),ambNome(l,it.amb),'#'+it.n].join(' ')).indexOf(q)<0) return; var k=ambById(l,it.amb)? it.amb : '_'; if(!gmap[k]){ gmap[k]={k:k, nome:ambNome(l,it.amb), its:[]}; grupos.push(gmap[k]); } gmap[k].its.push(it); });
-  html+='<div class="list" id="itList">'+grupos.map(function(g){ return '<div class="grp-h"><h3>'+h(g.nome)+'</h3><span>'+g.its.length+' itens</span></div>'+g.its.map(function(it){ var q=qtdItem(it), f0=(it.fotos||[])[0];
-      return '<button type="button" class="lrow p-'+it.prio+'" data-item="'+it.id+'"><span class="mini"'+(f0?' data-capa="'+f0.id+'"':'')+'></span><span class="grow"><span class="tt">#'+pad2(it.n)+' · '+h(it.serv||it.desc||'Item sem descrição')+'</span>'+
-        '<span class="meta">'+h(it.disc?discNome(it.disc):'Sem disciplina')+' · '+(isNaN(q)?'<span style="color:var(--warn)">sem quantidade</span>':fmtQ(q)+' '+h(it.und))+' · '+(it.fotos||[]).length+' 📷</span>'+
-        '<span><span class="badge p-'+it.prio+'">'+prioNome(it.prio)+'</span></span></span></button>'; }).join(''); }).join('')+'</div>';
-  return html; }
-
+// folha do ambiente (nome, medidas, observações, fotos do cômodo)
+var ambAberto=null;
+function abrirAmb(id){ ambAberto=id; renderAmbBox(); $('#ambOv').hidden=false; }
+function renderAmbBox(){ var a=ambById(cur,ambAberto); if(!a){ $('#ambOv').hidden=true; return; } var nmap=fotosNumeradas(cur).map, i=cur.ambs.indexOf(a);
+  $('#ambBox').innerHTML='<div class="row"><h2 class="grow">'+h(a.nome||'Ambiente')+'</h2><button type="button" class="btn pri sm" data-ambok>Pronto</button></div><div data-amb="'+a.id+'" style="display:flex;flex-direction:column;gap:12px">'+
+    '<div class="grid2">'+fld('Nome', '<input type="text" data-a="nome" value="'+h(a.nome)+'">')+fld('Pavimento', '<input type="text" data-a="pav" value="'+h(a.pav)+'" placeholder="Térreo, 1º…">')+'</div>'+
+    '<div class="grid4">'+fld('Compr. (m)', '<input type="text" inputmode="decimal" data-a="c" value="'+h(a.c)+'">')+fld('Larg. (m)', '<input type="text" inputmode="decimal" data-a="l" value="'+h(a.l)+'">')+fld('Pé-dir. (m)', '<input type="text" inputmode="decimal" data-a="pd" value="'+h(a.pd)+'">')+fld('Vãos (m²)', '<input type="text" inputmode="decimal" data-a="vaos" value="'+h(a.vaos)+'" placeholder="portas">')+'</div>'+
+    '<div class="calc" data-calc="'+a.id+'">'+calcHTML(ambCalc(a))+'</div>'+
+    fld('Observações do cômodo', '<textarea data-a="obs" rows="2" placeholder="Estado geral, acabamentos existentes">'+h(a.obs)+'</textarea>')+
+    '<div class="field"><span class="lbl">Fotos gerais do cômodo</span>'+thumbsHTML(a.fotos,'a:'+a.id,nmap)+'</div>'+
+    '<div class="row"><button type="button" class="btn sm" data-moveamb="'+a.id+'" data-dir="-1" '+(i===0?'disabled':'')+'>↑ Subir</button><button type="button" class="btn sm" data-moveamb="'+a.id+'" data-dir="1" '+(i===cur.ambs.length-1?'disabled':'')+'>↓ Descer</button><span class="grow"></span><button type="button" class="btn sm danger" data-delamb="'+a.id+'">Apagar</button></div></div>';
+  loadThumbs($('#ambBox')); }
+function fecharAmb(){ $('#ambOv').hidden=true; ambAberto=null; touch(); if(view==='lev') { var y=window.scrollY; renderLev(); window.scrollTo(0,y); } }
+function htmlDadosVisita(){ var l=cur;
+  var gps=l.gps? '<a class="btn sm" target="_blank" rel="noopener" href="https://maps.google.com/?q='+l.gps.lat+','+l.gps.lng+'">Ver no mapa</a>' : '';
+  return fld('Obra / título', inp('titulo', l.titulo, 'Ex.: Reforma casa R. da Esperança, 1022'))+
+    '<div class="grid2">'+fld('Cliente', inp('cliente', l.cliente))+fld('Contato', inp('contato', l.contato, 'Telefone', ' inputmode="tel"'))+'</div>'+
+    fld('Endereço', inp('endereco', l.endereco, 'Rua, nº, bairro, cidade'))+
+    '<div class="row"><button type="button" class="btn sm dark" data-gps>📍 '+(l.gps?'Atualizar localização':'Marcar localização')+'</button>'+gps+'</div>'+
+    '<div class="field"><span class="lbl">Tipo de serviço</span>'+chipsK('tipoServ', TIPOS_SERV, l.tipoServ)+'</div>'+
+    '<div class="grid3">'+fld('Data', '<input type="date" data-k="data" value="'+h(l.data)+'">')+fld('Chegada', '<input type="time" data-k="hIni" value="'+h(l.hIni)+'">')+fld('Saída', '<input type="time" data-k="hFim" value="'+h(l.hFim)+'">')+'</div>'+
+    '<div class="field"><span class="lbl">Clima</span>'+chipsK('clima', CLIMAS, l.clima)+'</div>'+
+    '<div class="field"><span class="lbl">Choveu nas últimas 48 h?</span>'+chipsK('chuva48', ['Sim','Não','Não sei'], l.chuva48)+'</div>'+
+    '<div class="grid2">'+fld('Responsável técnico', inp('resp', l.resp))+fld('CREA / CAU', inp('crea', l.crea))+'</div>'+
+    fld('Quem acompanhou', inp('acomp', l.acomp, 'Nome e função'))+
+    '<div class="field"><span class="lbl">Tipo de imóvel</span>'+chipsK('imovel', IMOVEIS, l.imovel)+'</div>'+
+    '<div class="grid3">'+fld('Idade (anos)', inp('idade', l.idade, '', ' inputmode="decimal"'))+fld('Pavimentos', inp('pavs', l.pavs, '', ' inputmode="decimal"'))+fld('Área (m²)', inp('area', l.area, '', ' inputmode="decimal"'))+'</div>'+
+    '<div class="field"><span class="lbl">Ocupado durante a obra?</span>'+chipsK('ocupado', ['Sim','Não','Parcialmente'], l.ocupado)+'</div>'+
+    fld('O que o cliente pediu', ta('objetivo', l.objetivo, 'Ex.: resolver infiltração no banheiro e trocar o piso da sala', 3)); }
+// tela "novo levantamento": só o essencial
+function abrirNovo(){ $('#nvTitulo').value=''; $('#nvCliente').value=''; $('#nvEnd').value=''; $('#novoOv').hidden=false; setTimeout(function(){ $('#nvTitulo').focus(); },80); }
+$('#nvCancel').addEventListener('click',function(){ $('#novoOv').hidden=true; });
+$('#nvOk').addEventListener('click',function(){ var tt=$('#nvTitulo').value.trim(); if(!tt){ toast('Dê um nome para a obra.'); $('#nvTitulo').focus(); return; }
+  var l=novoLev(); l.titulo=tt; l.cliente=$('#nvCliente').value.trim(); l.endereco=$('#nvEnd').value.trim(); levs.push(l); cur=l; persist(l); $('#novoOv').hidden=true; tab='vis'; pushNav(); showView('lev');
+  if($('#nvGps').checked) marcarGPS(true); toast('Toque no cômodo onde você está para começar.'); });
 function htmlCk(){ var l=cur, tot=ckTodos(l).length, resp=ckRespondidos(l);
   var html='<h2 class="sheet-h">Checklist da visita</h2><p class="note">S = sim, N = não, N/A = não se aplica. Escreva o detalhe quando precisar (ex.: “energia só 127 V”). Vai para o relatório e para a planilha.</p>'+
     '<div class="prog"><i style="width:'+(tot?Math.round(resp/tot*100):0)+'%"></i></div><p class="note">'+resp+' de '+tot+' respondidos</p>';
@@ -251,65 +238,56 @@ function htmlCk(){ var l=cur, tot=ckTodos(l).length, resp=ckRespondidos(l);
   return html; }
 
 function pendencias(l){ var p=[], its=l.itens||[];
-  if(!l.titulo) p.push('Falta o nome da obra (aba Dados).');
-  if(!l.endereco) p.push('Falta o endereço (aba Dados).');
-  var semQ=its.filter(function(it){ return isNaN(qtdItem(it)); }); if(semQ.length) p.push(semQ.length+' item(ns) sem quantidade: '+semQ.slice(0,6).map(function(i){ return '#'+pad2(i.n); }).join(', ')+(semQ.length>6?'…':''));
-  var semD=its.filter(function(it){ return !it.disc; }); if(semD.length) p.push(semD.length+' item(ns) sem disciplina (ficam em “Outros” na planilha).');
-  var semS=its.filter(function(it){ return !it.serv; }); if(semS.length) p.push(semS.length+' item(ns) sem o serviço a executar.');
+  if(!l.endereco) p.push('Endereço da obra (em Dados da visita, abaixo).');
+  var semQ=its.filter(function(it){ return isNaN(qtdItem(it)); }); if(semQ.length) p.push(semQ.length+' item(ns) sem quantidade.');
   var semF=its.filter(function(it){ return !(it.fotos||[]).length; }); if(semF.length) p.push(semF.length+' item(ns) sem foto.');
-  var fl=fotosNumeradas(l).list, semL=fl.filter(function(f){ return !f.leg; }).length; if(semL) p.push(semL+' foto(s) sem legenda (o relatório usa o nome do item no lugar).');
   var falt=ckTodos(l).length-ckRespondidos(l); if(falt) p.push(falt+' pergunta(s) do checklist sem resposta.');
-  if(!l.hFim) p.push('Falta a hora de saída (aba Dados).');
   return p; }
-function htmlFim(){ var l=cur, c=l.concl, pend=pendencias(l);
-  return '<h2 class="sheet-h">Antes de sair da obra</h2>'+
-    (pend.length? '<div class="msg err"><b>Confira:</b><ul style="margin:6px 0 0;padding-left:18px">'+pend.map(function(x){ return '<li>'+h(x)+'</li>'; }).join('')+'</ul></div>' : '<div class="msg">Tudo preenchido. Pode gerar o relatório e a planilha.</div>')+
-    '<h2 class="sheet-h">Conclusões</h2>'+
-    '<div class="card pad">'+
-      fld('Diagnóstico geral', '<textarea data-c="diag" rows="4" placeholder="Resumo do estado do imóvel e dos problemas principais, com a causa provável">'+h(c.diag)+'</textarea>')+
-      fld('Sequência de execução recomendada', '<textarea data-c="seq" rows="4" placeholder="Ex.: 1) escorar e demolir; 2) tratar a fonte da infiltração; 3) impermeabilizar; 4) revestimentos; 5) pintura">'+h(c.seq)+'</textarea>')+
-      fld('Ensaios, projetos e laudos necessários', '<textarea data-c="ensaios" rows="3" placeholder="Ex.: verificação estrutural da laje, pacometria, projeto elétrico">'+h(c.ensaios)+'</textarea>')+
-      fld('Informações pendentes (confirmar com o cliente)', '<textarea data-c="pend" rows="3" placeholder="Ex.: padrão de acabamento, se vai morar durante a obra, prazo desejado">'+h(c.pend)+'</textarea>')+
-      '<div class="grid2">'+fld('Prazo estimado (dias úteis)', '<input type="text" inputmode="decimal" data-c="prazo" value="'+h(c.prazo)+'">')+fld('Equipe sugerida', '<input type="text" data-c="equipe" value="'+h(c.equipe)+'" placeholder="Ex.: 2 pedreiros + 1 ajudante">')+'</div>'+
-      fld('Observações finais', '<textarea data-c="obs" rows="3">'+h(c.obs)+'</textarea>')+
+function htmlRel(){ var l=cur, c=l.concl, pend=pendencias(l);
+  return (pend.length? '<div class="msg err"><b>Falta conferir:</b><ul style="margin:6px 0 0;padding-left:18px">'+pend.map(function(x){ return '<li>'+h(x)+'</li>'; }).join('')+'</ul></div>' : '<div class="msg">Tudo preenchido.</div>')+
+    '<div class="exp">'+
+      '<button type="button" class="btn pri" data-act="pdf"><span>📄 Relatório fotográfico (PDF)</span></button>'+
+      '<button type="button" class="btn" data-xls><span>📊 Planilha de orçamento (Excel)</span></button>'+
+      '<div class="grid2"><button type="button" class="btn" data-zip>🗂️ Fotos (ZIP)</button><button type="button" class="btn" data-txt>💬 Resumo</button></div>'+
     '</div>'+
-    '<h2 class="sheet-h">Assinaturas</h2>'+
-    '<div class="card pad">'+
+    '<details class="card"'+(l.titulo&&l.endereco?'':' open')+'><summary><span class="chev">›</span><h2>Dados da visita</h2><span class="sum">'+h(br(l.data))+'</span></summary><div class="body">'+htmlDadosVisita()+'</div></details>'+
+    '<details class="card"><summary><span class="chev">›</span><h2>Conclusões</h2><span class="sum">'+(c.diag?'preenchido':'opcional')+'</span></summary><div class="body">'+
+      fld('Diagnóstico geral', '<textarea data-c="diag" rows="4" placeholder="Resumo do estado do imóvel e dos problemas principais">'+h(c.diag)+'</textarea>')+
+      fld('Sequência de execução', '<textarea data-c="seq" rows="3" placeholder="Ex.: 1) demolir; 2) impermeabilizar; 3) revestir; 4) pintar">'+h(c.seq)+'</textarea>')+
+      fld('Ensaios / projetos necessários', '<textarea data-c="ensaios" rows="2">'+h(c.ensaios)+'</textarea>')+
+      fld('Confirmar com o cliente', '<textarea data-c="pend" rows="2" placeholder="Ex.: padrão de acabamento, prazo desejado">'+h(c.pend)+'</textarea>')+
+      '<div class="grid2">'+fld('Prazo (dias úteis)', '<input type="text" inputmode="decimal" data-c="prazo" value="'+h(c.prazo)+'">')+fld('Equipe sugerida', '<input type="text" data-c="equipe" value="'+h(c.equipe)+'">')+'</div>'+
+      fld('Observações finais', '<textarea data-c="obs" rows="2">'+h(c.obs)+'</textarea>')+
+    '</div></details>'+
+    '<details class="card"><summary><span class="chev">›</span><h2>Assinaturas</h2><span class="sum">'+((l.ass.resp.sig?1:0)+(l.ass.cli.sig?1:0))+'/2</span></summary><div class="body">'+
       '<div class="sig" data-s="resp"><div class="lbl">Responsável técnico</div><input type="text" data-sn="resp" value="'+h(l.ass.resp.nome||l.resp)+'" placeholder="Nome"><div class="sigimg" data-sign="resp">Toque para assinar</div></div>'+
       '<div class="sig" data-s="cli"><div class="lbl">Cliente / acompanhante</div><input type="text" data-sn="cli" value="'+h(l.ass.cli.nome||l.acomp||l.cliente)+'" placeholder="Nome"><div class="sigimg" data-sign="cli">Toque para assinar</div></div>'+
-    '</div>'+
-    '<h2 class="sheet-h">Gerar arquivos</h2>'+
-    '<div class="exp">'+
-      '<button type="button" class="btn pri" data-act="pdf"><span>📄 Relatório fotográfico (PDF)<small>Capa, dados, checklist, cada ambiente e item com fotos numeradas, quantitativos e conclusões</small></span></button>'+
-      '<button type="button" class="btn" data-xls><span>📊 Planilha de orçamento e levantamento (Excel)<small>Orçamento por disciplina com colunas de custo e BDI, memória de cálculo, ambientes, checklist e lista de fotos</small></span></button>'+
-      '<button type="button" class="btn" data-zip><span>🗂️ Fotos numeradas (ZIP)<small>F01, F02… com ambiente e item no nome, iguais às do relatório</small></span></button>'+
-      '<button type="button" class="btn" data-txt><span>💬 Resumo em texto<small>Para colar no WhatsApp ou no e-mail</small></span></button>'+
-    '</div>'+
-    '<div class="row"><button type="button" class="btn grow '+(l.status==='ok'?'':'dark')+'" data-status>'+(l.status==='ok'?'Reabrir (voltar para “em campo”)':'Marcar como concluído')+'</button></div>'; }
+    '</div></details>'+
+    '<button type="button" class="btn full '+(l.status==='ok'?'':'dark')+'" data-status>'+(l.status==='ok'?'Reabrir levantamento':'✓ Marcar como concluído')+'</button>'+
+    '<button type="button" class="btn danger full" data-dellev>Apagar este levantamento</button>'; }
 
 // ---------- eventos da aba ----------
-var vl=$('#view-lev');
-vl.addEventListener('input',function(e){ var t=e.target; if(!cur) return;
+var vl=$('#view-lev'), ab=$('#ambBox');
+function onLevInput(e){ var t=e.target; if(!cur) return;
   if(t.dataset.k){ cur[t.dataset.k]=t.value; if(t.dataset.k==='titulo'||t.dataset.k==='cliente'||t.dataset.k==='data') setSub(); touch(); return; }
   if(t.dataset.c){ cur.concl[t.dataset.c]=t.value; touch(); return; }
   if(t.dataset.sn){ cur.ass[t.dataset.sn].nome=t.value; touch(); return; }
   if(t.dataset.cko){ var r=cur.ck[t.dataset.cko]||(cur.ck[t.dataset.cko]={}); r.o=t.value; touch(); return; }
-  if(t.id==='qIt'){ filtroIt=t.value; var pos=t.selectionStart; renderLev(); var q=$('#qIt'); if(q){ q.focus(); try{ q.setSelectionRange(pos,pos); }catch(x){} } return; }
   if(t.dataset.a){ var box=t.closest('[data-amb]'); var a=ambById(cur, box.dataset.amb); if(!a) return; a[t.dataset.a]=t.value; touch();
-    if(t.dataset.a==='nome'){ box.querySelector('summary h2').textContent=t.value||'Ambiente'; }
+    if(t.dataset.a==='nome'){ var hh=$('#ambBox h2'); if(hh) hh.textContent=t.value||'Ambiente'; }
     var cc=box.querySelector('[data-calc]'); if(cc) cc.innerHTML=calcHTML(ambCalc(a)); }
-});
-vl.addEventListener('change',function(e){ var t=e.target; if(t.dataset.addph) addPhotos(t.dataset.addph, t.files).then(function(){ t.value=''; }); });
-vl.addEventListener('toggle',function(e){ var d=e.target; if(d.dataset&&d.dataset.amb){ var a=ambById(cur,d.dataset.amb); if(a) a._open=d.open; } },true);
-vl.addEventListener('click',function(e){ var t=e.target, b;
+}
+vl.addEventListener('input',onLevInput); ab.addEventListener('input',onLevInput);
+function onLevClick(e){ var t=e.target, b;
   if((b=t.closest('[data-chip]'))){ var k=b.dataset.chip, v=b.dataset.v; cur[k]= cur[k]===v? '' : v; $$('[data-chip="'+k+'"]',vl).forEach(function(x){ x.setAttribute('aria-pressed', String(cur[k]===x.dataset.v)); }); touch(); return; }
   if((b=t.closest('[data-ph]'))){ abrirFoto(b.dataset.owner, b.dataset.ph); return; }
   if((b=t.closest('[data-item]'))){ var it=cur.itens.find(function(x){ return x.id===b.dataset.item; }); if(it) abrirItem(it); return; }
   if((b=t.closest('[data-addamb]'))){ addAmb(b.dataset.addamb); return; }
-  if((b=t.closest('[data-veramb]'))){ var a0=ambById(cur,b.dataset.veramb); filtroIt=a0? a0.nome : ''; tab='itens'; renderLev(); renderBar(); window.scrollTo(0,0); return; }
-  if((b=t.closest('[data-moveamb]'))){ var i=cur.ambs.findIndex(function(a){ return a.id===b.dataset.moveamb; }), j=i+(+b.dataset.dir); if(i<0||j<0||j>=cur.ambs.length) return; var tmp=cur.ambs[i]; cur.ambs[i]=cur.ambs[j]; cur.ambs[j]=tmp; touch(); renderLev(); return; }
+  if((b=t.closest('[data-editamb]'))){ abrirAmb(b.dataset.editamb); return; }
+  if(t.closest('[data-ambok]')){ fecharAmb(); return; }
+  if((b=t.closest('[data-moveamb]'))){ var i=cur.ambs.findIndex(function(a){ return a.id===b.dataset.moveamb; }), j=i+(+b.dataset.dir); if(i<0||j<0||j>=cur.ambs.length) return; var tmp=cur.ambs[i]; cur.ambs[i]=cur.ambs[j]; cur.ambs[j]=tmp; touch(); renderAmbBox(); return; }
   if((b=t.closest('[data-delamb]'))){ var a1=ambById(cur,b.dataset.delamb); var nIt=cur.itens.filter(function(it){ return it.amb===a1.id; }).length;
-    confirmar('Apagar ambiente?', '“'+(a1.nome||'Ambiente')+'” e suas '+(a1.fotos||[]).length+' fotos serão apagados.'+(nIt?' Os '+nIt+' itens dele continuam, como “Geral”.':''), 'Apagar', function(){ (a1.fotos||[]).forEach(function(p){ apagarBlobFoto(p); }); cur.itens.forEach(function(it){ if(it.amb===a1.id) it.amb=''; }); cur.ambs=cur.ambs.filter(function(a){ return a!==a1; }); touch(); renderLev(); }); return; }
+    confirmar('Apagar ambiente?', '“'+(a1.nome||'Ambiente')+'” e suas '+(a1.fotos||[]).length+' fotos serão apagados.'+(nIt?' Os '+nIt+' itens dele continuam, como “Geral”.':''), 'Apagar', function(){ (a1.fotos||[]).forEach(function(p){ apagarBlobFoto(p); }); cur.itens.forEach(function(it){ if(it.amb===a1.id) it.amb=''; }); cur.ambs=cur.ambs.filter(function(a){ return a!==a1; }); touch(); fecharAmb(); }); return; }
   if((b=t.closest('[data-ck]'))){ var r=cur.ck[b.dataset.ck]||(cur.ck[b.dataset.ck]={}); r.v= r.v===b.dataset.v? '' : b.dataset.v; $$('[data-ck="'+b.dataset.ck+'"]',vl).forEach(function(x){ x.setAttribute('aria-pressed', String(r.v===x.dataset.v)); }); setSub(); touch(); return; }
   if(t.closest('[data-ckadd]')){ var q=prompt('O que foi verificado?'); if(q&&q.trim()){ cur.ckExtra=cur.ckExtra||[]; cur.ckExtra.push({k:uid('cx'), q:q.trim()}); touch(); renderLev(); } return; }
   if((b=t.closest('[data-ckdel]'))){ cur.ckExtra=cur.ckExtra.filter(function(x){ return x.k!==b.dataset.ckdel; }); delete cur.ck[b.dataset.ckdel]; touch(); renderLev(); return; }
@@ -320,68 +298,69 @@ vl.addEventListener('click',function(e){ var t=e.target, b;
   if(t.closest('[data-zip]')){ gerarZIP(t.closest('[data-zip]')); return; }
   if(t.closest('[data-txt]')){ resumoTexto(); return; }
   if(t.closest('[data-status]')){ cur.status= cur.status==='ok'? 'campo' : 'ok'; if(cur.status==='ok'&&!cur.hFim) cur.hFim=nowHM(); touch(); renderLev(); toast(cur.status==='ok'?'Levantamento concluído.':'Levantamento reaberto.'); return; }
-});
+}
+vl.addEventListener('click',onLevClick); ab.addEventListener('click',onLevClick);
+$('#ambOv').addEventListener('click',function(e){ if(e.target.id==='ambOv') fecharAmb(); });
 $('#barIn').addEventListener('change',function(e){ var t=e.target;
   if(t.dataset.addph) addPhotos(t.dataset.addph, t.files).then(function(){ t.value=''; });
 });
 function addAmb(nome){ var base=nome, k=2; while(nome && cur.ambs.some(function(a){ return a.nome===nome; })){ nome=base+' '+(k++); }
-  var a=novoAmb(nome); a._open=true; cur.ambs.forEach(function(x){ x._open=false; }); cur.ambs.push(a); touch(); tab='amb'; renderLev(); renderBar();
-  setTimeout(function(){ var el=$('[data-amb="'+a.id+'"]'); if(el){ el.scrollIntoView({block:'start'}); if(!nome){ var n=el.querySelector('[data-a="nome"]'); if(n) n.focus(); } } },60); }
+  var a=novoAmb(nome); cur.ambs.push(a); touch(); tab='vis'; renderLev(); renderBar();
+  setTimeout(function(){ var el=$('[data-ambsec="'+a.id+'"]'); if(el) el.scrollIntoView({block:'start',behavior:'smooth'}); },60); toast('“'+a.nome+'” criado. Toque no nome para pôr as medidas.'); }
 async function apagarLev(l){
   var todas=[]; (l.fotos||[]).forEach(function(p){ todas.push(p); }); (l.ambs||[]).forEach(function(a){ (a.fotos||[]).forEach(function(p){ todas.push(p); }); }); (l.itens||[]).forEach(function(i){ (i.fotos||[]).forEach(function(p){ todas.push(p); }); });
   todas.forEach(apagarBlobFoto); ['resp','cli'].forEach(function(k){ if(l.ass[k].sig) DB.delB(l.ass[k].sig).catch(function(){}); });
   await DB.del(l.id); levs=levs.filter(function(x){ return x!==l; }); cur=null; showView('lista'); toast('Levantamento apagado.'); }
-function marcarGPS(){ if(!navigator.geolocation){ toast('Este celular não liberou a localização.'); return; } toast('Buscando a localização…');
-  navigator.geolocation.getCurrentPosition(function(p){ cur.gps={lat:p.coords.latitude, lng:p.coords.longitude, acc:Math.round(p.coords.accuracy)}; touch(); renderLev(); toast('Localização marcada (precisão de '+cur.gps.acc+' m).'); },
+function marcarGPS(quieto){ if(!navigator.geolocation){ if(!quieto) toast('Este celular não liberou a localização.'); return; } if(!quieto) toast('Buscando a localização…'); var l=cur;
+  navigator.geolocation.getCurrentPosition(function(p){ l.gps={lat:p.coords.latitude, lng:p.coords.longitude, acc:Math.round(p.coords.accuracy)}; touch(); if(view==='lev'&&tab==='rel') renderLev(); if(!quieto) toast('Localização marcada (precisão de '+l.gps.acc+' m).'); },
     function(){ toast('Não consegui a localização. Confira se o Safari tem permissão em Ajustes → Privacidade → Localização.'); }, {enableHighAccuracy:true, timeout:15000, maximumAge:60000}); }
 
-// ---------- ITEM ----------
+// ---------- ITEM (essencial à mostra; detalhes recolhidos) ----------
 function renderItem(){ var it=curItem, l=cur; if(!it||!l) return; setSub(); var nmap=fotosNumeradas(l).map;
-  var d=discById(it.disc), q=qtdItem(it);
+  var d=discById(it.disc), q=qtdItem(it), temMed=(it.med||[]).length>0;
   var ambChips='<div class="chips scroll">'+l.ambs.map(function(a){ return '<button type="button" class="chip" data-iamb="'+a.id+'" aria-pressed="'+(it.amb===a.id)+'">'+h(a.nome||'Ambiente')+'</button>'; }).join('')+
-    '<button type="button" class="chip" data-iamb="" aria-pressed="'+(!ambById(l,it.amb))+'">Geral</button><button type="button" class="chip" data-iambnovo>+ Novo ambiente</button></div>';
+    '<button type="button" class="chip" data-iamb="" aria-pressed="'+(!ambById(l,it.amb))+'">Geral</button><button type="button" class="chip" data-iambnovo>+ Novo</button></div>';
   var html=
   '<div class="card pad">'+
-    '<div class="field"><span class="lbl">Ambiente</span>'+ambChips+'</div>'+
+    thumbsHTML(it.fotos,'i',nmap)+
+    '<div class="field"><span class="lbl">Onde</span>'+ambChips+'</div>'+
+    '<label class="field"><span class="lbl">O que encontrou / o que precisa ser feito</span><textarea data-i="desc" rows="3" placeholder="Ex.: Infiltração no box com bolor até 1,20 m. Refazer impermeabilização.">'+h(it.desc)+'</textarea></label>'+
+    '<div class="field"><span class="lbl">Prioridade</span><div class="chips">'+PRIO.map(function(p){ return '<button type="button" class="chip p-'+p.id+'" data-iprio="'+p.id+'" aria-pressed="'+(it.prio===p.id)+'">'+h(p.n)+'</button>'; }).join('')+'</div></div>'+
+    '<div class="field"><span class="lbl">Quantidade</span><div class="qrow"><input type="text" inputmode="decimal" data-i="qtdMan" value="'+h(it.qtdMan)+'" placeholder="'+(temMed&&!isNaN(q)?'= '+fmtQ(q)+' pelas medidas':'Ex.: 12,5')+'"><select data-i="und" aria-label="Unidade">'+UND.map(function(u){ return '<option'+(it.und===u?' selected':'')+'>'+h(u)+'</option>'; }).join('')+'</select></div>'+
+      (ambById(l,it.amb)? pullHTML(it,true) : '')+'</div>'+
+  '</div>'+
+  '<details class="card"'+(temMed?' open':'')+'><summary><span class="chev">›</span><h2>Medidas detalhadas</h2><span class="sum" id="qtdSum">'+(isNaN(q)?'':fmtQ(q)+' '+h(it.und))+'</span></summary><div class="body">'+
+    '<div class="medhead"><span>Trecho</span><span>Compr.</span><span>Larg.</span><span>Alt.</span><span>Vezes</span><span></span></div>'+
+    '<div class="med" id="medBox">'+(it.med||[]).map(medRowHTML).join('')+'</div>'+
+    '<div class="row"><button type="button" class="btn sm" data-addmed>+ Linha</button><button type="button" class="btn sm" data-addmed="neg">− Desconto (portas, janelas)</button></div>'+
+    '<div class="medtot"><span class="lbl">Total das medidas</span><span class="qtd" id="qtdTot">'+(isNaN(q)?'—':fmtQ(q))+' '+h(it.und)+'</span></div>'+
+    '<p class="note">Cada linha multiplica as medidas preenchidas pelo nº de vezes. Se você digitar a quantidade lá em cima, ela vale no lugar destas medidas.</p>'+
+  '</div></details>'+
+  '<details class="card"'+(it.disc&&it.serv?'':'')+'><summary><span class="chev">›</span><h2>Serviço e como fazer</h2><span class="sum">'+(it.serv?h(discNome(it.disc)):'pode ser depois')+'</span></summary><div class="body">'+
     '<label class="field"><span class="lbl">Disciplina</span><select data-i="disc"><option value="">Escolha…</option>'+DISC.map(function(x){ return '<option value="'+x.id+'"'+(it.disc===x.id?' selected':'')+'>'+h(x.n)+'</option>'; }).join('')+'</select></label>'+
-    (d&&d.t.length? '<details'+(it.serv?'':' open')+'><summary class="lbl" style="cursor:pointer;padding:4px 0">Serviços sugeridos ('+d.t.length+') – toque para preencher</summary><div class="list" style="margin-top:8px">'+d.t.map(function(s,i){ return '<button type="button" class="tplc" data-tpl="'+i+'"><b>'+h(s.s)+' <span class="badge">'+h(s.u)+'</span></b><span>'+h(s.c)+'</span></button>'; }).join('')+'</div></details>' : '')+
-    '<label class="field"><span class="lbl">Serviço a executar</span><input type="text" data-i="serv" value="'+h(it.serv)+'" placeholder="Ex.: Impermeabilização do box com argamassa polimérica"></label>'+
-  '</div>'+
-  '<div class="card pad">'+
-    '<label class="field"><span class="lbl">O que foi encontrado (situação atual)</span><textarea data-i="desc" rows="3" placeholder="Ex.: Mancha de umidade com bolor na parede do box até 1,20 m de altura, rejunte escuro e pastilhas ocas">'+h(it.desc)+'</textarea></label>'+
-    '<label class="field"><span class="lbl">Causa provável</span><input type="text" data-i="causa" value="'+h(it.causa)+'" placeholder="Ex.: Falta de impermeabilização no box / vazamento no registro"></label>'+
-    '<label class="field"><span class="lbl">Como deve ser feito</span><textarea data-i="como" rows="4" placeholder="Método de execução, cuidados e critérios">'+h(it.como)+'</textarea></label>'+
-    '<div class="field"><span class="lbl">Prioridade</span><div class="chips">'+PRIO.map(function(p){ return '<button type="button" class="chip p-'+p.id+'" data-iprio="'+p.id+'" aria-pressed="'+(it.prio===p.id)+'" title="'+h(p.d)+'">'+h(p.n)+'</button>'; }).join('')+'</div><span class="note" id="prioDesc">'+h((PRIO.find(function(p){ return p.id===it.prio; })||{}).d||'')+'</span></div>'+
+    (d&&d.t.length? '<div class="field"><span class="lbl">Toque num serviço para preencher</span><div class="list">'+d.t.map(function(s2,i){ return '<button type="button" class="tplc" data-tpl="'+i+'"><b>'+h(s2.s)+' <span class="badge">'+h(s2.u)+'</span></b></button>'; }).join('')+'</div></div>' : '')+
+    '<label class="field"><span class="lbl">Serviço a executar</span><input type="text" data-i="serv" value="'+h(it.serv)+'" placeholder="Ex.: Impermeabilização do box"></label>'+
+    '<label class="field"><span class="lbl">Como deve ser feito</span><textarea data-i="como" rows="4">'+h(it.como)+'</textarea></label>'+
+    '<label class="field"><span class="lbl">Causa provável</span><input type="text" data-i="causa" value="'+h(it.causa)+'"></label>'+
+    '<label class="field"><span class="lbl">Material / especificação</span><input type="text" data-i="mat" value="'+h(it.mat)+'"></label>'+
+  '</div></details>'+
+  '<details class="card"><summary><span class="chev">›</span><h2>Mais</h2><span class="sum">natureza, observações</span></summary><div class="body">'+
     '<div class="field"><span class="lbl">Natureza</span><div class="chips">'+TIPO.map(function(p){ return '<button type="button" class="chip" data-itipo="'+p.id+'" aria-pressed="'+(it.tipo===p.id)+'">'+h(p.n)+'</button>'; }).join('')+'</div></div>'+
-  '</div>'+
-  '<div class="card pad"><div class="field"><span class="lbl">Fotos do item</span>'+thumbsHTML(it.fotos,'i',nmap)+'</div><p class="note">Toque na foto para pôr legenda ou marcar o defeito com seta e círculo.</p></div>'+
-  '<div class="card pad">'+
-    '<div class="field"><span class="lbl">Unidade</span><div class="chips">'+UND.map(function(u){ return '<button type="button" class="chip" data-iund="'+h(u)+'" aria-pressed="'+(it.und===u)+'">'+h(u)+'</button>'; }).join('')+'</div></div>'+
-    '<div class="field"><span class="lbl">Medições (memória de cálculo)</span>'+
-      '<div class="medhead"><span>Descrição</span><span>Compr.</span><span>Larg.</span><span>Alt./esp.</span><span>Vezes</span><span></span></div>'+
-      '<div class="med" id="medBox">'+(it.med||[]).map(medRowHTML).join('')+'</div>'+
-      '<div class="row"><button type="button" class="btn sm" data-addmed>+ Linha</button><button type="button" class="btn sm" data-addmed="neg">− Desconto</button></div>'+
-      pullHTML(it)+
-    '</div>'+
-    '<div class="medtot"><span class="lbl">Quantidade</span><span class="qtd" id="qtdTot">'+(isNaN(q)?'—':fmtQ(q))+' '+h(it.und)+'</span></div>'+
-    '<label class="field"><span class="lbl">Ou quantidade direta (substitui as medições)</span><input type="text" inputmode="decimal" data-i="qtdMan" value="'+h(it.qtdMan)+'" placeholder="Ex.: 3 (para 3 un)"></label>'+
-    '<p class="note">Cada linha multiplica as medidas preenchidas pelo nº de vezes. Ex.: parede 3,20 × 2,80 = 8,96 m². Use “− Desconto” para tirar portas e janelas.</p>'+
-  '</div>'+
-  '<div class="card pad">'+
-    '<label class="field"><span class="lbl">Material / especificação</span><input type="text" data-i="mat" value="'+h(it.mat)+'" placeholder="Ex.: Porcelanato 60×60 retificado, argamassa AC-III"></label>'+
-    '<label class="field"><span class="lbl">Observações</span><textarea data-i="obs" rows="3" placeholder="Acesso difícil, precisa de andaime, cliente quer cotação de 2 opções…">'+h(it.obs)+'</textarea></label>'+
-  '</div>'+
-  '<div class="row"><button type="button" class="btn grow" data-idup>Duplicar item</button><button type="button" class="btn danger grow" data-idel>Apagar item</button></div>';
-  $('#view-item').innerHTML=html; loadThumbs($('#view-item')); }
+    '<label class="field"><span class="lbl">Observações</span><textarea data-i="obs" rows="3" placeholder="Acesso difícil, precisa de andaime…">'+h(it.obs)+'</textarea></label>'+
+    '<div class="row"><button type="button" class="btn grow" data-idup>Duplicar</button><button type="button" class="btn danger grow" data-idel>Apagar item</button></div>'+
+  '</div></details>';
+  var vw=$('#view-item'), abertos=(vw.dataset.it===it.id)? $$('details',vw).map(function(d){ return d.open; }) : null;
+  vw.innerHTML=html; vw.dataset.it=it.id; if(abertos) $$('details',vw).forEach(function(d,i){ if(abertos[i]) d.open=true; }); loadThumbs(vw); }
 function medRowHTML(m,i){ return '<div class="medrow'+(m.neg?' neg':'')+'" data-mi="'+i+'"><input type="text" data-m="d" value="'+h(m.d)+'" placeholder="'+(m.neg?'Desconto':'Trecho')+'">'+
   ['c','l','h','n'].map(function(k){ return '<input type="text" inputmode="decimal" data-m="'+k+'" value="'+h(m[k])+'"'+(k==='n'?' placeholder="1"':'')+'>'; }).join('')+'<button type="button" class="x" data-delmed="'+i+'" aria-label="Apagar linha">×</button></div>'; }
-function pullHTML(it){ var a=ambById(cur,it.amb); if(!a) return ''; var c=ambCalc(a); if(isNaN(c.piso)) return '<p class="note">Cadastre as medidas de “'+h(a.nome)+'” na aba Ambientes para puxar as áreas daqui.</p>';
+function pullHTML(it){ var a=ambById(cur,it.amb); if(!a) return ''; var c=ambCalc(a); if(isNaN(c.piso)) return '<p class="note">Dica: pondo as medidas de “'+h(a.nome)+'” (toque no nome dele na Vistoria), dá para puxar piso e paredes com um toque.</p>';
   var b=[['piso','Piso '+fmt(c.piso)+' m²'],['teto','Teto '+fmt(c.teto)+' m²'],['perim','Perímetro '+fmt(c.perim)+' m']]; if(!isNaN(c.paredes)) b.splice(1,0,['paredes','Paredes '+fmt(c.paredes)+' m²']);
-  return '<div class="pull"><span class="lbl" style="width:100%">Puxar de “'+h(a.nome)+'”</span>'+b.map(function(x){ return '<button type="button" class="chip" data-pull="'+x[0]+'">+ '+x[1]+'</button>'; }).join('')+'</div>'; }
-function atualizaQtd(){ var q=qtdItem(curItem); var el=$('#qtdTot'); if(el) el.textContent=(isNaN(q)?'—':fmtQ(q))+' '+curItem.und; }
+  return '<div class="pull"><span class="note" style="width:100%">Usar a medida de “'+h(a.nome)+'”:</span>'+b.map(function(x){ return '<button type="button" class="chip" data-pull="'+x[0]+'">+ '+x[1]+'</button>'; }).join('')+'</div>'; }
+function atualizaQtd(){ var it=curItem, q=qtdItem(it); var el=$('#qtdTot'); if(el) el.textContent=(isNaN(q)?'—':fmtQ(q))+' '+it.und; var sm=$('#qtdSum'); if(sm) sm.textContent=isNaN(q)?'':fmtQ(q)+' '+it.und;
+  var qi=$('[data-i="qtdMan"]'); if(qi&&(it.med||[]).length){ var mq=0,ok=false; it.med.forEach(function(m){ var p=medParcial(m); if(p) ok=true; mq+=p; }); qi.placeholder= ok? '= '+fmtQ(mq)+' pelas medidas' : 'Ex.: 12,5'; } }
 var vi=$('#view-item');
 vi.addEventListener('input',function(e){ var t=e.target, it=curItem; if(!it) return;
-  if(t.dataset.i){ it[t.dataset.i]=t.value; if(t.dataset.i==='serv') setSub(); if(t.dataset.i==='qtdMan') atualizaQtd(); touch(); return; }
+  if(t.dataset.i){ if(t.dataset.i==='disc') return; it[t.dataset.i]=t.value; if(t.dataset.i==='serv') setSub(); if(t.dataset.i==='qtdMan'||t.dataset.i==='und') atualizaQtd(); touch(); return; }
   if(t.dataset.m){ var r=t.closest('[data-mi]'); var m=it.med[+r.dataset.mi]; if(!m) return; m[t.dataset.m]=t.value; atualizaQtd(); touch(); }
 });
 vi.addEventListener('change',function(e){ var t=e.target, it=curItem;
@@ -389,15 +368,14 @@ vi.addEventListener('change',function(e){ var t=e.target, it=curItem;
   if(t.dataset.addph) addPhotos(t.dataset.addph, t.files).then(function(){ t.value=''; });
 });
 vi.addEventListener('click',function(e){ var t=e.target, it=curItem, b; if(!it) return;
-  if((b=t.closest('[data-iamb]'))){ it.amb=b.dataset.iamb; touch(); renderItem(); return; }
-  if(t.closest('[data-iambnovo]')){ var n=prompt('Nome do ambiente (ex.: Banheiro social)'); if(n&&n.trim()){ var a=novoAmb(n.trim()); cur.ambs.push(a); it.amb=a.id; touch(); renderItem(); toast('Ambiente criado. Lance as medidas dele na aba Ambientes.'); } return; }
+  if((b=t.closest('[data-iamb]'))){ it.amb=b.dataset.iamb; cur.lastAmb=it.amb; touch(); renderItem(); return; }
+  if(t.closest('[data-iambnovo]')){ var n=prompt('Nome do ambiente (ex.: Banheiro social)'); if(n&&n.trim()){ var a=novoAmb(n.trim()); cur.ambs.push(a); it.amb=a.id; cur.lastAmb=a.id; touch(); renderItem(); toast('Ambiente criado.'); } return; }
   if((b=t.closest('[data-tpl]'))){ var d=discById(it.disc), s=d&&d.t[+b.dataset.tpl]; if(!s) return;
     var sobre= (it.como&&it.como!==s.c)? confirm('Trocar o texto de “Como deve ser feito” pelo método sugerido?') : true;
-    it.serv=s.s; it.und=s.u; if(sobre) it.como=s.c; touch(); renderItem(); toast('Preenchido. Ajuste o que precisar.'); return; }
-  if((b=t.closest('[data-iprio]'))){ it.prio=b.dataset.iprio; $$('[data-iprio]',vi).forEach(function(x){ x.setAttribute('aria-pressed', String(x.dataset.iprio===it.prio)); }); $('#prioDesc').textContent=(PRIO.find(function(p){ return p.id===it.prio; })||{}).d||''; touch(); return; }
+    it.serv=s.s; if(!it.qtdMan&&!(it.med||[]).length) it.und=s.u; if(sobre) it.como=s.c; touch(); renderItem(); var dd=$$('#view-item details')[1]; if(dd) dd.open=true; toast('Serviço preenchido.'); return; }
+  if((b=t.closest('[data-iprio]'))){ it.prio=b.dataset.iprio; $$('[data-iprio]',vi).forEach(function(x){ x.setAttribute('aria-pressed', String(x.dataset.iprio===it.prio)); }); touch(); return; }
   if((b=t.closest('[data-itipo]'))){ it.tipo=b.dataset.itipo; $$('[data-itipo]',vi).forEach(function(x){ x.setAttribute('aria-pressed', String(x.dataset.itipo===it.tipo)); }); touch(); return; }
-  if((b=t.closest('[data-iund]'))){ it.und=b.dataset.iund; $$('[data-iund]',vi).forEach(function(x){ x.setAttribute('aria-pressed', String(x.dataset.iund===it.und)); }); atualizaQtd(); touch(); return; }
-  if((b=t.closest('[data-addmed]'))){ it.med=it.med||[]; var neg=b.dataset.addmed==='neg'; it.med.push({d:neg?'Desconto':'', c:'', l:'', h:'', n:'', neg:neg}); touch(); redrawMed(true); return; }
+  if((b=t.closest('[data-addmed]'))){ it.med=it.med||[]; var neg=b.dataset.addmed==='neg'; it.med.push({d:neg?'Desconto':'', c:'', l:'', h:'', n:'', neg:neg}); if(it.qtdMan){ it.qtdMan=''; var qi=$('[data-i="qtdMan"]'); if(qi) qi.value=''; } touch(); redrawMed(true); return; }
   if((b=t.closest('[data-delmed]'))){ it.med.splice(+b.dataset.delmed,1); touch(); redrawMed(); return; }
   if((b=t.closest('[data-pull]'))){ var a=ambById(cur,it.amb), c=ambCalc(a), k=b.dataset.pull; it.med=it.med||[];
     if(k==='piso') it.med.push({d:'Piso – '+a.nome, c:a.c, l:a.l, h:'', n:'', neg:false});
@@ -405,7 +383,7 @@ vi.addEventListener('click',function(e){ var t=e.target, it=curItem, b; if(!it) 
     else if(k==='perim') it.med.push({d:'Perímetro – '+a.nome, c:fmt(c.perim).replace(/\./g,''), l:'', h:'', n:'', neg:false});
     else if(k==='paredes'){ it.med.push({d:'Paredes – '+a.nome, c:fmt(c.perim).replace(/\./g,''), l:'', h:a.pd, n:'', neg:false}); if(num(a.vaos)>0) it.med.push({d:'Vãos (portas/janelas)', c:a.vaos, l:'', h:'', n:'', neg:true}); }
     it.und= k==='perim'? 'm' : 'm²';
-    it.qtdMan=''; touch(); renderItem(); toast('Medida puxada do ambiente.'); return; }
+    it.qtdMan=''; touch(); renderItem(); toast('Medida do ambiente usada. Ajuste em “Medidas detalhadas” se precisar.'); return; }
   if((b=t.closest('[data-ph]'))){ abrirFoto('i', b.dataset.ph); return; }
   if(t.closest('[data-idup]')){ var c2=JSON.parse(JSON.stringify(it)); cur.seqItem=(cur.seqItem||0)+1; c2.id=uid('it'); c2.n=cur.seqItem; c2.fotos=[]; c2.criado=Date.now(); cur.itens.push(c2); curItem=c2; touch(); renderItem(); window.scrollTo(0,0); toast('Item duplicado como #'+pad2(c2.n)+' (sem as fotos).'); return; }
   if(t.closest('[data-idel]')){ confirmar('Apagar item?', '#'+pad2(it.n)+' '+(it.serv||'')+' e suas '+(it.fotos||[]).length+' fotos.', 'Apagar', function(){ (it.fotos||[]).forEach(apagarBlobFoto); cur.itens=cur.itens.filter(function(x){ return x!==it; }); touch(); curItem=null; if(history.state&&history.state.lev) history.back(); else voltar(); }); return; }
@@ -428,7 +406,7 @@ function abrirTimestamp(){ if(!cur) return; flush();
   window.location.href=(cfg.tsUrl||TS_PADRAO); }
 function tsPendente(){ var p=LS.get('tsPend'); if(!p) return null; if(Date.now()-p.t>30*60*1000){ LS.set('tsPend',null); return null; } return p; }
 function tsVoltou(){ var p=tsPendente(); if(!p) return; if(Date.now()-p.t<1500) return;   // ainda saindo para o outro app
-  if(!cur||cur.id!==p.lev){ var l=levs.find(function(x){ return x.id===p.lev; }); if(!l){ LS.set('tsPend',null); return; } cur=l; tab=p.tab||'itens'; showView('lev'); }
+  if(!cur||cur.id!==p.lev){ var l=levs.find(function(x){ return x.id===p.lev; }); if(!l){ LS.set('tsPend',null); return; } cur=l; tab='vis'; showView('lev'); }
   if(p.view==='item'&&p.item&&(!curItem||curItem.id!==p.item)){ var it=cur.itens.find(function(x){ return x.id===p.item; }); if(it){ curItem=it; showView('item'); } }
   camOwner=p.owner; $('#retOv').hidden=false; }
 $('#retPick').addEventListener('click',function(){ LS.set('tsPend',null); setTimeout(function(){ $('#retOv').hidden=true; },300); });
@@ -441,7 +419,7 @@ $('#camOv').addEventListener('click',function(e){ if(e.target.id==='camOv') $('#
 ['#camIn','#galIn'].forEach(function(sel){ $(sel).addEventListener('change',function(){ var t=this, files=t.files; $('#camOv').hidden=true; if(!files||!files.length||!cur) return;
   var lista=Array.prototype.slice.call(files); t.value=''; receberFotos(camOwner, lista); }); });
 function receberFotos(owner, files){
-  if(owner==='quick'){ var it=novoItem(cur,'',''); cur.itens.push(it); curItem=it; return addPhotos('i', files).then(function(){ pushNav(); showView('item'); toast('Foto salva no item #'+pad2(it.n)+'. Agora descreva o que é.'); }); }
+  if(owner==='quick'||owner.indexOf('quick:')===0){ var aid= owner==='quick'? (cur.lastAmb||'') : owner.slice(6); if(aid&&!ambById(cur,aid)) aid=''; cur.lastAmb=aid; if(view==='lev'&&tab==='vis') cur._scrollVis=window.scrollY; var it=novoItem(cur,aid,''); cur.itens.push(it); curItem=it; return addPhotos('i', files).then(function(){ pushNav(); showView('item'); toast('Foto salva. Agora escreva o que é.'); setTimeout(function(){ var d=$('[data-i="desc"]'); if(d) d.focus(); },300); }); }
   return addPhotos(owner, files); }
 
 // lê a data e o GPS gravados na foto (EXIF), antes de reduzir o tamanho
@@ -477,7 +455,7 @@ function ownerList(owner){ if(owner==='lev') return cur.fotos; if(owner==='i') r
 async function addPhotos(owner, files){ if(!files||!files.length||!cur) return; var list=ownerList(owner); if(!list) return; setSync('salvando foto…'); var ok=0;
   for(var k=0;k<files.length;k++){ try{ var ex=await lerExif(files[k]); var b=await shrink(files[k]); var id=uid('ph'); await DB.putB(id,b); var rec={id:id, d:ex.data||new Date().toISOString(), leg:''}; if(ex.data) rec.exif=1; if(ex.gps) rec.gps=ex.gps; list.push(rec); ok++; } catch(e){ console.error(e); toast('Não consegui ler uma das fotos.'); } }
   touch(); await flush(); refreshAfterPhoto(); if(ok) toast(ok>1? ok+' fotos salvas.' : 'Foto salva. Toque nela para pôr legenda.'); }
-function refreshAfterPhoto(){ var y=window.scrollY; if(view==='item') renderItem(); else if(view==='lev') renderLev(); window.scrollTo(0,y); }
+function refreshAfterPhoto(){ var y=window.scrollY; if(!$('#ambOv').hidden) renderAmbBox(); if(view==='item') renderItem(); else if(view==='lev') renderLev(); window.scrollTo(0,y); }
 function apagarBlobFoto(p){ DB.delB(p.id).catch(function(){}); if(p.orig) DB.delB(p.orig).catch(function(){}); delete urlCache[p.id]; }
 var phSel={owner:null, p:null};
 async function abrirFoto(owner, id){ var list=ownerList(owner); var p=list&&list.find(function(x){ return x.id===id; }); if(!p) return; phSel={owner:owner, p:p};
@@ -608,7 +586,7 @@ async function deliver(name, blob, mime, okMsg){ var file=null; try{ file=new Fi
     showReady(name, blob, file); return; }
   showReady(name, blob, file); }
 function showReady(name, blob, file){ if(ready.url) URL.revokeObjectURL(ready.url); ready.file=file; ready.url=URL.createObjectURL(blob);
-  $('#readyName').textContent=name+' ('+(blob.size/1048576).toFixed(1).replace('.',',')+' MB)'; var a=$('#readyOpen'); a.href=ready.url; a.setAttribute('download',name);
+  $('#readyName').textContent=name+' ('+(blob.size<1048576? Math.max(1,Math.round(blob.size/1024))+' KB' : (blob.size/1048576).toFixed(1).replace('.',',')+' MB')+')'; var a=$('#readyOpen'); a.href=ready.url; a.setAttribute('download',name);
   $('#readyShare').hidden=!(file&&navigator.canShare&&navigator.canShare({files:[file]})); $('#readyOv').hidden=false; }
 $('#readyShare').addEventListener('click',function(){ if(ready.file) navigator.share({files:[ready.file],title:ready.file.name}).then(function(){ $('#readyOv').hidden=true; }).catch(function(){}); });
 $('#readyClose').addEventListener('click',function(){ $('#readyOv').hidden=true; });
@@ -688,7 +666,7 @@ try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(
   showView(cfg.empresa||levs.length? 'lista' : 'cfg');
   if(!cfg.empresa&&!levs.length) toast('Primeiro, preencha os dados da empresa. Depois é só abrir um levantamento.');
   try{ var ro=JSON.parse(sessionStorage.getItem('lev:reopen')||'null'); sessionStorage.removeItem('lev:reopen'); var upd=sessionStorage.getItem('lev:updated'); sessionStorage.removeItem('lev:updated');
-    if(ro&&ro.id){ var l=levs.find(function(x){ return x.id===ro.id; }); if(l){ cur=l; tab=ro.tab||'dados'; showView('lev'); if(ro.view==='item'&&ro.item){ var it=l.itens.find(function(x){ return x.id===ro.item; }); if(it){ curItem=it; showView('item'); } } } }
+    if(ro&&ro.id){ var l=levs.find(function(x){ return x.id===ro.id; }); if(l){ cur=l; tab=ro.tab||'vis'; showView('lev'); if(ro.view==='item'&&ro.item){ var it=l.itens.find(function(x){ return x.id===ro.item; }); if(it){ curItem=it; showView('item'); } } } }
     if(upd) setTimeout(function(){ toast('App atualizado para a versão nova.'); },400); }catch(e){}
   setTimeout(tsVoltou,700);
   setTimeout(checkUpdate,1500);
