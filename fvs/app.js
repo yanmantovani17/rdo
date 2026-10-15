@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = 5;   // troque junto com version.json a cada publicação
+var APP_VER = 6;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -576,7 +576,12 @@ async function ntAtivar(){
 }
 async function ntTestar(){
   var b=$('#ntTestar'); b.disabled=true; b.textContent='Enviando…';
-  try{ var r=await gsCall({acao:'testar'}); ntMsg(r&&r.enviados? 'Notificação de teste enviada. Ela chega em alguns segundos (bloqueie a tela para ver).' : 'A planilha não encontrou celulares cadastrados. Toque em "Ativar lembretes" de novo.', !(r&&r.enviados)); }
+  try{ var r=await gsCall({acao:'testar'});
+    if(!r||!r.ok){ ntMsg('A planilha não respondeu ao teste: '+((r&&r.erro)||'erro desconhecido'),true); }
+    else if(!r.total){ ntMsg('A planilha não tem nenhum celular cadastrado. Toque em "Ativar lembretes" de novo (pelo ícone da tela inicial).',true); }
+    else if(r.enviados){ ntMsg('A Apple aceitou a notificação de teste ('+r.enviados+' de '+r.total+' celular(es)). Ela chega em alguns segundos: bloqueie a tela para ver.'+(r.gatilhos&&r.gatilhos.length?'':' Atenção: os horários das 10h e 19h não estão instalados no script (rode a função instalar).')); }
+    else { var d=(r.detalhes||[])[0]||{}; ntMsg('A Apple recusou a notificação (código '+(d.codigo||'?')+': '+(d.resposta||'sem detalhe')+'). Toque em "Ativar lembretes" de novo e repita o teste. Se continuar, mande um print desta mensagem.',true); }
+  }
   catch(e){ ntMsg('Não consegui pedir o teste. Confira a internet.',true); }
   b.disabled=false; b.textContent='Mandar uma notificação de teste';
 }

@@ -55,7 +55,11 @@ function doPost(e) {
     if (body.acao === 'sessao') return json_({ ok: true, usuario: quem.usuario, nome: quem.nome });
     if (body.acao === 'sair') { PropertiesService.getScriptProperties().deleteProperty('S_' + body.token); return json_({ ok: true }); }
     if (body.acao === 'assinar') return json_(assinar_(body, quem));
-    if (body.acao === 'testar') return json_({ ok: true, enviados: enviarLembrete_() });
+    if (body.acao === 'testar') {
+      var res = enviarLembrete_('teste');
+      var gat = ScriptApp.getProjectTriggers().map(function (t) { return t.getHandlerFunction(); }).filter(function (n) { return /^lembrete/.test(n); });
+      return json_({ ok: true, enviados: res.ok, total: res.total, detalhes: res.detalhes, gatilhos: gat });
+    }
     return json_(fvsReceber_(body, quem));
   } catch (err) {
     return json_({ ok: false, erro: String(err) });
@@ -168,7 +172,7 @@ function fvsIndicadores_(ss, refazer) {
       if ((v === 'A' || v === 'R') && fin.indexOf('Aprovado') === 0) x.fin++;
       if (fin === 'Reparo pendente') x.pend++;
     });
-    if (v === 'R') { var k = p + '|' + l[7]; rep[k] = (rep[k] || 0) + 1; }
+    if (v === 'R') { var k = p + '|' + l[7] + (l[8] && l[8] !== l[7] ? ' – ' + l[8] : ''); rep[k] = (rep[k] || 0) + 1; }
   });
   function pct_(a, b) { return b ? a / b : ''; }
   function linha_(nome, x) { var av = x.A + x.R; return [nome, x.fvs, av, x.A, x.R, x.NA, pct_(x.A, av), pct_(x.fin, av), x.pend]; }
@@ -307,8 +311,8 @@ function instalarLembretes() {
   UrlFetchApp.getRequest('https://web.push.apple.com/'); // pede a autorização de envio já agora
   Logger.log('Lembretes do FVS instalados: todo dia por volta das 10h e das 19h. Celulares cadastrados: ' + assinaturas_().length);
 }
-function lembreteManha() { enviarLembrete_(); }
-function lembreteNoite() { enviarLembrete_(); }
+function lembreteManha() { enviarLembrete_('10h'); }
+function lembreteNoite() { enviarLembrete_('19h'); }
 
 function assinaturas_() { return JSON.parse(PropertiesService.getScriptProperties().getProperty('ASSINATURAS') || '[]'); }
 function salvarAssinaturas_(l) { PropertiesService.getScriptProperties().setProperty('ASSINATURAS', JSON.stringify(l)); }
@@ -319,28 +323,41 @@ function assinar_(body, quem) {
   var l = assinaturas_().filter(function (x) { return x.endpoint !== a.endpoint; });
   l.push({ endpoint: a.endpoint, obra: body.obra || '', usuario: quem ? quem.usuario : '', criado: new Date().toISOString() });
   salvarAssinaturas_(l.slice(-20));
+  logLembrete_('cadastro', quem ? quem.usuario : '', String(a.endpoint).replace(/^https:\/\/([^\/]+).*$/, '$1'), '', 'celular cadastrado para lembretes (' + l.length + ' no total)');
   return { ok: true, total: l.length };
 }
 
-function enviarLembrete_() {
-  var k = chaves_(), l = assinaturas_(), manter = [], ok = 0, ativos = {};
+function enviarLembrete_(origem) {
+  var k = chaves_(), l = assinaturas_(), manter = [], ok = 0, ativos = {}, detalhes = [];
   usuarios_().forEach(function (u) { if (u.ativo) ativos[u.chave] = true; });
+  if (!l.length) logLembrete_(origem, '', '', '', 'nenhum celular cadastrado: toque em "Ativar lembretes" no app');
   l.forEach(function (a) {
-    if (a.usuario && !ativos[String(a.usuario).toLowerCase()]) return; // usuário desativado: para de receber
+    var host = String(a.endpoint).replace(/^https:\/\/([^\/]+).*$/, '$1');
+    if (a.usuario && !ativos[String(a.usuario).toLowerCase()]) { logLembrete_(origem, a.usuario, host, '', 'usuário desativado: não enviado'); return; }
     try {
       var r = UrlFetchApp.fetch(a.endpoint, {
-        method: 'post', muteHttpExceptions: true,
+        method: 'post', muteHttpExceptions: true, payload: '', contentType: 'application/octet-stream',
         headers: { TTL: '21600', Urgency: 'high', Authorization: vapidAuth_(a.endpoint, k, SUB_VAPID) }
       });
-      var c = r.getResponseCode();
+      var c = r.getResponseCode(), txt = String(r.getContentText() || '').slice(0, 300);
+      detalhes.push({ usuario: a.usuario, servidor: host, codigo: c, resposta: txt });
+      logLembrete_(origem, a.usuario, host, c, (c >= 200 && c < 300) ? 'entregue ao servidor de notificações' : txt);
       if (c === 404 || c === 410) return;           // celular desinstalou ou desativou
       if (c >= 200 && c < 300) ok++;
-      else Logger.log('Push ' + c + ': ' + r.getContentText());
       manter.push(a);
-    } catch (err) { Logger.log(String(err)); manter.push(a); }
+    } catch (err) { detalhes.push({ usuario: a.usuario, servidor: host, codigo: 0, resposta: String(err) }); logLembrete_(origem, a.usuario, host, 'erro', String(err)); manter.push(a); }
   });
   salvarAssinaturas_(manter);
-  return ok;
+  return { ok: ok, total: l.length, detalhes: detalhes };
+}
+// registro de cada envio na aba "Lembretes" da planilha (para conferir se as notificações saíram)
+function logLembrete_(origem, usuario, servidor, codigo, resposta) {
+  try {
+    var ss = planilha_(), sh = ss.getSheetByName('Lembretes');
+    if (!sh) { sh = ss.insertSheet('Lembretes'); sh.getRange(1, 1, 1, 6).setValues([['Quando', 'Origem', 'Usuario', 'Servidor', 'Codigo', 'Resposta']]).setFontWeight('bold'); sh.setFrozenRows(1); }
+    sh.appendRow([new Date(), origem || '', usuario || '', servidor || '', codigo, resposta || '']);
+    var n = sh.getLastRow(); if (n > 501) sh.deleteRows(2, n - 501);
+  } catch (e) { Logger.log(String(e)); }
 }
 
 function chaves_() {
