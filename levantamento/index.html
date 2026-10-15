@@ -144,7 +144,7 @@ textarea{resize:vertical;min-height:76px}
 .th{width:84px;height:84px;border-radius:8px;background:var(--surface-2) center/cover no-repeat;border:1px solid var(--line);position:relative;flex:none;cursor:pointer;padding:0}
 .th .num{position:absolute;left:4px;bottom:4px;font-family:var(--f-mono);font-size:.68rem;background:rgba(0,0,0,.65);color:#fff;border-radius:4px;padding:0 4px}
 .th .lg{position:absolute;right:4px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--ok);border:2px solid #fff}
-.addph{width:84px;height:84px;border:2px dashed var(--line);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;font-size:.78rem;font-weight:600;text-align:center;flex:none;gap:2px}
+.addph{font:inherit;padding:0;background:transparent;width:84px;height:84px;border:2px dashed var(--line);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;font-size:.78rem;font-weight:600;text-align:center;flex:none;gap:2px}
 .addph input{display:none}
 .addph .ico{font-size:1.4rem;line-height:1}
 .addph.cam{border-color:var(--signal);color:var(--ink);background:var(--signal-soft)}
@@ -199,6 +199,7 @@ textarea{resize:vertical;min-height:76px}
 .bar .btn.cam{flex:0 0 auto;min-width:64px;font-size:1.25rem}
 .bar .btn.cam input{display:none}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--asphalt);color:var(--asphalt-ink);padding:10px 16px;border-radius:8px;z-index:60;max-width:calc(100% - 32px);font-size:.92rem;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+body:has(.ov:not([hidden])) .toast{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 12px)}
 .msg{font-size:.9rem;border-radius:8px;padding:10px 12px;background:var(--ok-soft);color:var(--ink)}
 .msg.err{background:var(--warn-soft)}
 #cfmBack{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;padding:16px}
@@ -272,6 +273,30 @@ textarea{resize:vertical;min-height:76px}
       <button type="button" class="btn danger" id="phDel">Remover foto</button>
     </div>
     <p class="note" id="phInfo"></p>
+  </div>
+</div>
+
+<!-- câmera ou galeria -->
+<div class="ov" id="camOv" hidden>
+  <div class="ov-box">
+    <h2>Adicionar foto</h2>
+    <button type="button" class="btn pri full" id="tsPick">⏱️ Tirar pelo Timestamp</button>
+    <label class="btn full" id="camPick">📷 Câmera do app<input type="file" id="camIn" accept="image/*" capture="environment" hidden></label>
+    <label class="btn full" id="galPick">🖼️ Escolher da galeria<input type="file" id="galIn" accept="image/*" multiple hidden></label>
+    <p class="note">O Timestamp abre por um atalho do app Atalhos (configure uma vez na aba Empresa e app). Na galeria dá para escolher várias fotos de uma vez.</p>
+    <label class="row" style="gap:10px;font-size:.92rem"><input type="checkbox" id="camLembrar" style="width:22px;height:22px">Lembrar minha escolha</label>
+    <button type="button" class="btn full" id="camCancel">Cancelar</button>
+  </div>
+</div>
+
+<!-- volta do Timestamp -->
+<div class="ov" id="retOv" hidden>
+  <div class="ov-box">
+    <h2>Fotos do Timestamp</h2>
+    <p class="note">Toque abaixo e escolha as fotos que você acabou de tirar. As mais recentes aparecem primeiro, e dá para marcar várias.</p>
+    <label class="btn pri full" id="retPick">🖼️ Pegar as fotos que tirei<input type="file" id="retIn" accept="image/*" multiple hidden></label>
+    <button type="button" class="btn full" id="retMais">⏱️ Voltar ao Timestamp</button>
+    <button type="button" class="btn full" id="retCancel">Agora não</button>
   </div>
 </div>
 

@@ -1,5 +1,5 @@
 // Mantém o app funcionando sem internet. Ao publicar uma nova versão, troque VERSAO (e o version.json).
-const VERSAO = 'lev-v1';
+const VERSAO = 'lev-v3';
 const ARQUIVOS = ['./', 'index.html', 'app.js', 'modelos.js', 'relatorio.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'jszip.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSAO).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

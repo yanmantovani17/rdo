@@ -2,7 +2,7 @@
 // Gera o relatório fotográfico (PDF), a planilha de orçamento/levantamento (Excel) e as fotos numeradas (ZIP).
 (function(){
 'use strict';
-var APP_VER = 1;   // troque junto com version.json a cada publicação
+var APP_VER = 3;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -77,7 +77,7 @@ function itensOrdenados(lev){ var ord={}; (lev.ambs||[]).forEach(function(a,i){ 
   return (lev.itens||[]).slice().sort(function(a,b){ var oa=(a.amb in ord)? ord[a.amb] : 1e6, ob=(b.amb in ord)? ord[b.amb] : 1e6; return oa-ob || a.n-b.n; }); }
 // numeração única das fotos (igual no PDF, na planilha e no ZIP)
 function fotosNumeradas(lev){ var out=[], map={};
-  function add(p, onde, item, amb){ out.push({id:p.id, num:out.length+1, leg:p.leg||'', d:p.d, onde:onde, item:item, amb:amb}); map[p.id]=out.length; }
+  function add(p, onde, item, amb){ out.push({id:p.id, num:out.length+1, leg:p.leg||'', d:p.d, gps:p.gps||null, onde:onde, item:item, amb:amb}); map[p.id]=out.length; }
   (lev.fotos||[]).forEach(function(p){ add(p,'Geral / fachada',null,null); });
   var its=itensOrdenados(lev);
   (lev.ambs||[]).forEach(function(a){ (a.fotos||[]).forEach(function(p){ add(p, a.nome||'Ambiente', null, a); });
@@ -130,8 +130,8 @@ function renderBar(){ var b=$('#barIn'), html='';
   else if(view==='lev'){
     if(tab==='amb') html='<button type="button" class="btn dark" data-act="novoAmb">+ Ambiente</button><button type="button" class="btn pri" data-act="novoItem">+ Item</button>';
     else if(tab==='fim') html='<button type="button" class="btn pri" data-act="pdf">Gerar relatório fotográfico (PDF)</button>';
-    else html='<label class="btn cam" aria-label="Foto rápida (vira um item novo)">📷<input type="file" accept="image/*" multiple data-quick></label><button type="button" class="btn pri" data-act="novoItem">+ Item</button>';
-  } else if(view==='item') html='<label class="btn cam" aria-label="Adicionar foto">📷<input type="file" accept="image/*" multiple data-addph="i"></label><button type="button" class="btn dark" data-act="outroItem">+ Outro item</button><button type="button" class="btn pri" data-act="pronto">Pronto</button>';
+    else html='<button type="button" class="btn cam" data-cam="quick" aria-label="Foto rápida (vira um item novo)">📷</button><button type="button" class="btn pri" data-act="novoItem">+ Item</button>';
+  } else if(view==='item') html='<button type="button" class="btn cam" data-cam="i" aria-label="Adicionar foto">📷</button><button type="button" class="btn dark" data-act="outroItem">+ Outro item</button><button type="button" class="btn pri" data-act="pronto">Pronto</button>';
   b.innerHTML=html; }
 document.addEventListener('click',function(e){ var a=e.target.closest('[data-act]'); if(!a) return; var act=a.dataset.act;
   if(act==='novoLev'){ var l=novoLev(); levs.push(l); cur=l; persist(l); tab='dados'; pushNav(); showView('lev'); toast('Levantamento Nº '+String(l.n).padStart(3,'0')+' aberto. Comece pelos dados da visita.'); }
@@ -178,7 +178,7 @@ function ta(k, val, ph, rows){ return '<textarea data-k="'+k+'" rows="'+(rows||3
 function chipsK(k, list, val){ return '<div class="chips">'+list.map(function(o){ return '<button type="button" class="chip" data-chip="'+k+'" data-v="'+h(o)+'" aria-pressed="'+(val===o)+'">'+h(o)+'</button>'; }).join('')+'</div>'; }
 function thumbsHTML(list, owner, nmap){ return '<div class="thumbs" data-thumbs="'+owner+'">'+(list||[]).map(function(p){ var n=nmap&&nmap[p.id];
     return '<button type="button" class="th" data-ph="'+p.id+'" data-owner="'+owner+'" aria-label="Foto '+(n||'')+'">'+(n?'<span class="num">F'+pad2(n)+'</span>':'')+(p.leg?'<span class="lg" title="Com legenda"></span>':'')+'</button>'; }).join('')+
-  '<label class="addph cam"><span class="ico">📷</span>Foto<input type="file" accept="image/*" multiple data-addph="'+owner+'"></label></div>'; }
+  '<button type="button" class="addph cam" data-cam="'+owner+'"><span class="ico">📷</span>Foto</button></div>'; }
 
 function htmlDados(){ var l=cur, nmap=fotosNumeradas(l).map;
   var gps=l.gps? '<a class="btn sm" target="_blank" rel="noopener" href="https://maps.google.com/?q='+l.gps.lat+','+l.gps.lng+'">Ver no mapa ('+fmt(l.gps.lat,5)+', '+fmt(l.gps.lng,5)+')</a>' : '';
@@ -322,7 +322,6 @@ vl.addEventListener('click',function(e){ var t=e.target, b;
   if(t.closest('[data-status]')){ cur.status= cur.status==='ok'? 'campo' : 'ok'; if(cur.status==='ok'&&!cur.hFim) cur.hFim=nowHM(); touch(); renderLev(); toast(cur.status==='ok'?'Levantamento concluído.':'Levantamento reaberto.'); return; }
 });
 $('#barIn').addEventListener('change',function(e){ var t=e.target;
-  if(t.dataset.quick!=null){ var files=t.files; if(!files||!files.length) return; var it=novoItem(cur,'',''); cur.itens.push(it); curItem=it; addPhotos('i', files).then(function(){ t.value=''; pushNav(); showView('item'); toast('Foto salva no item #'+pad2(it.n)+'. Agora descreva o que é.'); }); return; }
   if(t.dataset.addph) addPhotos(t.dataset.addph, t.files).then(function(){ t.value=''; });
 });
 function addAmb(nome){ var base=nome, k=2; while(nome && cur.ambs.some(function(a){ return a.nome===nome; })){ nome=base+' '+(k++); }
@@ -413,6 +412,61 @@ vi.addEventListener('click',function(e){ var t=e.target, it=curItem, b; if(!it) 
 });
 function redrawMed(focusLast){ var box=$('#medBox'); box.innerHTML=(curItem.med||[]).map(medRowHTML).join(''); atualizaQtd(); if(focusLast){ var rows=$$('.medrow',box); var r=rows[rows.length-1]; if(r){ var i=r.querySelector(r.classList.contains('neg')?'[data-m="c"]':'[data-m="d"]'); if(i) i.focus(); } } }
 
+// ---------- câmera: tirar agora ou escolher da galeria (ex.: fotos do app Timestamp) ----------
+var camOwner=null;
+function camAbrir(owner){ camOwner=owner; var m=cfg.camModo||'perguntar';
+  if(m==='camera') $('#camIn').click(); else if(m==='galeria') $('#galIn').click(); else if(m==='timestamp') abrirTimestamp();
+  else { $('#camLembrar').checked=false; $('#camOv').hidden=false; } }
+document.addEventListener('click',function(e){ var b=e.target.closest('[data-cam]'); if(b){ e.preventDefault(); camAbrir(b.dataset.cam); } });
+['#camPick','#galPick'].forEach(function(sel){ $(sel).addEventListener('click',function(){ if($('#camLembrar').checked){ cfg.camModo= sel==='#camPick'? 'camera' : 'galeria'; saveCfg(); toast('Escolha guardada. Para voltar a perguntar: aba Empresa e app.'); } }); });
+$('#camCancel').addEventListener('click',function(){ $('#camOv').hidden=true; });
+$('#tsPick').addEventListener('click',function(){ if($('#camLembrar').checked){ cfg.camModo='timestamp'; saveCfg(); } $('#camOv').hidden=true; abrirTimestamp(); });
+// abre o app de câmera (Timestamp) por um atalho do app Atalhos; ao voltar, oferece pegar as fotos recém-tiradas
+var TS_PADRAO='shortcuts://run-shortcut?name=Timestamp';
+function abrirTimestamp(){ if(!cur) return; flush();
+  LS.set('tsPend',{owner:camOwner, lev:cur.id, item:curItem&&curItem.id, view:view, tab:tab, t:Date.now()});
+  window.location.href=(cfg.tsUrl||TS_PADRAO); }
+function tsPendente(){ var p=LS.get('tsPend'); if(!p) return null; if(Date.now()-p.t>30*60*1000){ LS.set('tsPend',null); return null; } return p; }
+function tsVoltou(){ var p=tsPendente(); if(!p) return; if(Date.now()-p.t<1500) return;   // ainda saindo para o outro app
+  if(!cur||cur.id!==p.lev){ var l=levs.find(function(x){ return x.id===p.lev; }); if(!l){ LS.set('tsPend',null); return; } cur=l; tab=p.tab||'itens'; showView('lev'); }
+  if(p.view==='item'&&p.item&&(!curItem||curItem.id!==p.item)){ var it=cur.itens.find(function(x){ return x.id===p.item; }); if(it){ curItem=it; showView('item'); } }
+  camOwner=p.owner; $('#retOv').hidden=false; }
+$('#retPick').addEventListener('click',function(){ LS.set('tsPend',null); setTimeout(function(){ $('#retOv').hidden=true; },300); });
+$('#retMais').addEventListener('click',function(){ $('#retOv').hidden=true; abrirTimestamp(); });
+$('#retCancel').addEventListener('click',function(){ LS.set('tsPend',null); $('#retOv').hidden=true; });
+$('#retIn').addEventListener('change',function(){ var t=this, files=t.files; $('#retOv').hidden=true; if(!files||!files.length||!cur) return; var lista=Array.prototype.slice.call(files); t.value=''; receberFotos(camOwner, lista); });
+document.addEventListener('visibilitychange',function(){ if(!document.hidden) setTimeout(tsVoltou,400); });
+window.addEventListener('pageshow',function(){ setTimeout(tsVoltou,600); });
+$('#camOv').addEventListener('click',function(e){ if(e.target.id==='camOv') $('#camOv').hidden=true; });
+['#camIn','#galIn'].forEach(function(sel){ $(sel).addEventListener('change',function(){ var t=this, files=t.files; $('#camOv').hidden=true; if(!files||!files.length||!cur) return;
+  var lista=Array.prototype.slice.call(files); t.value=''; receberFotos(camOwner, lista); }); });
+function receberFotos(owner, files){
+  if(owner==='quick'){ var it=novoItem(cur,'',''); cur.itens.push(it); curItem=it; return addPhotos('i', files).then(function(){ pushNav(); showView('item'); toast('Foto salva no item #'+pad2(it.n)+'. Agora descreva o que é.'); }); }
+  return addPhotos(owner, files); }
+
+// lê a data e o GPS gravados na foto (EXIF), antes de reduzir o tamanho
+function lerExif(file){ return new Promise(function(res){ var vazio={data:null,gps:null};
+  if(!file||!/jpe?g/i.test(file.type||file.name||'')){ res(vazio); return; }
+  var rd=new FileReader(); rd.onerror=function(){ res(vazio); };
+  rd.onload=function(){ try{ res(parseExif(new DataView(rd.result))||vazio); }catch(e){ res(vazio); } };
+  rd.readAsArrayBuffer(file.slice(0,262144)); }); }
+function parseExif(v){ if(v.getUint16(0)!==0xFFD8) return null; var off=2;
+  while(off+4<v.byteLength){ var mk=v.getUint16(off); if((mk&0xFF00)!==0xFF00) return null; var len=v.getUint16(off+2);
+    if(mk===0xFFE1 && v.getUint32(off+4)===0x45786966) return lerTiff(v, off+10); off+=2+len; }
+  return null; }
+function lerTiff(v, t){ var le=v.getUint16(t)===0x4949; var u16=function(o){ return v.getUint16(o,le); }, u32=function(o){ return v.getUint32(o,le); };
+  function ifd(o){ var n=u16(o), tags={}; for(var i=0;i<n;i++){ var e=o+2+i*12; tags[u16(e)]={type:u16(e+2), count:u32(e+4), off:e+8}; } return tags; }
+  function str(tg){ var p= tg.count>4? t+u32(tg.off) : tg.off, s=''; for(var i=0;i<tg.count-1;i++) s+=String.fromCharCode(v.getUint8(p+i)); return s; }
+  function rats(tg){ var p=t+u32(tg.off), a=[]; for(var i=0;i<tg.count;i++) a.push(u32(p+i*8)/(u32(p+i*8+4)||1)); return a; }
+  var ifd0=ifd(t+u32(t+4)), out={data:null,gps:null};
+  if(ifd0[0x8769]){ var ex=ifd(t+u32(ifd0[0x8769].off)); var dt=ex[0x9003]||ex[0x9004]; if(dt){ var m=str(dt).match(/(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/); if(m){ var d=new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]); if(!isNaN(d)) out.data=d.toISOString(); } } }
+  if(!out.data && ifd0[0x0132]){ var m2=str(ifd0[0x0132]).match(/(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/); if(m2) out.data=new Date(+m2[1],+m2[2]-1,+m2[3],+m2[4],+m2[5],+m2[6]).toISOString(); }
+  if(ifd0[0x8825]){ var g=ifd(t+u32(ifd0[0x8825].off));
+    if(g[2]&&g[4]){ var la=rats(g[2]), lo=rats(g[4]); var lat=la[0]+la[1]/60+la[2]/3600, lng=lo[0]+lo[1]/60+lo[2]/3600;
+      if(g[1]&&String.fromCharCode(v.getUint8(g[1].off))==='S') lat=-lat; if(g[3]&&String.fromCharCode(v.getUint8(g[3].off))==='W') lng=-lng;
+      if(isFinite(lat)&&isFinite(lng)&&(lat||lng)) out.gps={lat:Math.round(lat*1e6)/1e6, lng:Math.round(lng*1e6)/1e6}; } }
+  return out; }
+
 // ---------- fotos ----------
 var urlCache={};
 async function blobURL(key){ if(urlCache[key]) return urlCache[key]; var b=await DB.getB(key); if(!b) return null; return (urlCache[key]=URL.createObjectURL(b)); }
@@ -421,7 +475,7 @@ function loadImg(blob){ return new Promise(function(res,rej){ var u=URL.createOb
 async function shrink(file){ var im=await loadImg(file); var max=1800, s=Math.min(1, max/Math.max(im.naturalWidth,im.naturalHeight)); var c=document.createElement('canvas'); c.width=Math.round(im.naturalWidth*s); c.height=Math.round(im.naturalHeight*s); c.getContext('2d').drawImage(im,0,0,c.width,c.height); return new Promise(function(res){ c.toBlob(res,'image/jpeg',0.84); }); }
 function ownerList(owner){ if(owner==='lev') return cur.fotos; if(owner==='i') return curItem.fotos; if(owner.indexOf('a:')===0){ var a=ambById(cur, owner.slice(2)); return a? a.fotos : null; } return null; }
 async function addPhotos(owner, files){ if(!files||!files.length||!cur) return; var list=ownerList(owner); if(!list) return; setSync('salvando foto…'); var ok=0;
-  for(var k=0;k<files.length;k++){ try{ var b=await shrink(files[k]); var id=uid('ph'); await DB.putB(id,b); list.push({id:id, d:new Date().toISOString(), leg:''}); ok++; } catch(e){ console.error(e); toast('Não consegui ler uma das fotos.'); } }
+  for(var k=0;k<files.length;k++){ try{ var ex=await lerExif(files[k]); var b=await shrink(files[k]); var id=uid('ph'); await DB.putB(id,b); var rec={id:id, d:ex.data||new Date().toISOString(), leg:''}; if(ex.data) rec.exif=1; if(ex.gps) rec.gps=ex.gps; list.push(rec); ok++; } catch(e){ console.error(e); toast('Não consegui ler uma das fotos.'); } }
   touch(); await flush(); refreshAfterPhoto(); if(ok) toast(ok>1? ok+' fotos salvas.' : 'Foto salva. Toque nela para pôr legenda.'); }
 function refreshAfterPhoto(){ var y=window.scrollY; if(view==='item') renderItem(); else if(view==='lev') renderLev(); window.scrollTo(0,y); }
 function apagarBlobFoto(p){ DB.delB(p.id).catch(function(){}); if(p.orig) DB.delB(p.orig).catch(function(){}); delete urlCache[p.id]; }
@@ -429,7 +483,7 @@ var phSel={owner:null, p:null};
 async function abrirFoto(owner, id){ var list=ownerList(owner); var p=list&&list.find(function(x){ return x.id===id; }); if(!p) return; phSel={owner:owner, p:p};
   var u=await blobURL(p.id); $('#phImg').src=u||''; var n=fotosNumeradas(cur).map[p.id];
   $('#phTit').textContent='Foto F'+pad2(n||0); $('#phLeg').value=p.leg||''; $('#phOrig').hidden=!p.orig; $('#phCapa').textContent= capaId(cur)===p.id? 'É a capa ✓' : 'Usar como capa';
-  $('#phInfo').textContent='Tirada em '+brDT(p.d)+'.'; $('#phOv').hidden=false; }
+  $('#phInfo').innerHTML=(p.exif?'Tirada em ':'Adicionada em ')+h(brDT(p.d))+(p.exif?' (data gravada na foto)':'')+'.'+(p.gps?' Localização: <a target="_blank" rel="noopener" href="https://maps.google.com/?q='+p.gps.lat+','+p.gps.lng+'">'+fmt(p.gps.lat,5)+', '+fmt(p.gps.lng,5)+'</a>.':''); $('#phOv').hidden=false; }
 function fecharFoto(){ $('#phOv').hidden=true; touch(); refreshAfterPhoto(); }
 $('#phClose').addEventListener('click',fecharFoto);
 $('#phOv').addEventListener('click',function(e){ if(e.target.id==='phOv') fecharFoto(); });
@@ -509,6 +563,19 @@ function renderCfg(){ var el=$('#view-cfg');
     '<div class="field"><span class="lbl">Logo da empresa</span><div class="logo-box">'+(cfg.logo?'<img src="'+cfg.logo+'" alt="Logo">':'Sem logo – o relatório sai só com o nome da empresa.')+'</div>'+
       '<div class="row"><label class="btn dark grow">Escolher logo<input type="file" id="logoFile" accept="image/*" hidden></label>'+(cfg.logo?'<button type="button" class="btn ghost" id="logoDel">Remover</button>':'')+'</div></div>'+
     '<div class="field"><span class="lbl">Fotos no PDF</span><div class="chips">'+[['normal','Qualidade normal'],['leve','Arquivo leve (WhatsApp)']].map(function(o){ return '<button type="button" class="chip" data-fq="'+o[0]+'" aria-pressed="'+(cfg.fotoPdf===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div></div>'+
+    '<div class="field"><span class="lbl">Ao tocar no botão da câmera</span><div class="chips">'+[['perguntar','Perguntar sempre'],['timestamp','Abrir o Timestamp'],['camera','Câmera do app'],['galeria','Galeria']].map(function(o){ return '<button type="button" class="chip" data-cm="'+o[0]+'" aria-pressed="'+((cfg.camModo||'perguntar')===o[0])+'">'+o[1]+'</button>'; }).join('')+'</div></div>'+
+    '<details class="card" style="background:var(--surface-2)"'+(cfg.camModo==='timestamp'?' open':'')+'><summary><span class="chev">›</span><h2 style="font-size:1rem">Ligar ao Timestamp (uma vez só)</h2></summary><div class="body">'+
+      '<ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:.92rem">'+
+        '<li>Abra o app <b>Atalhos</b> do iPhone e toque em <b>+</b>.</li>'+
+        '<li>Toque em <b>Adicionar Ação</b>, busque <b>Abrir App</b> e escolha o <b>Timestamp</b>.</li>'+
+        '<li>Toque no nome do atalho no topo e chame de <b>Timestamp</b> (igual ao campo abaixo). Toque em OK.</li>'+
+        '<li>Volte aqui e toque em <b>Testar</b>. Na primeira vez o iPhone pergunta se pode abrir o Atalhos: toque em Abrir.</li>'+
+      '</ol>'+
+      '<label class="field"><span class="lbl">Endereço que abre o app de câmera</span><input type="text" data-cf="tsUrl" value="'+h(cfg.tsUrl||TS_PADRAO)+'" autocapitalize="off" autocorrect="off" spellcheck="false"></label>'+
+      '<span class="note">Se o seu atalho tiver outro nome, troque o final do endereço (espaço vira %20). Ex.: …?name=Camera%20Obra</span>'+
+      '<button type="button" class="btn dark" id="tsTest">Testar: abrir o Timestamp</button>'+
+      '<p class="note">Na obra: toque em 📷, tire as fotos no Timestamp e volte pelo “◀ Atalhos” no canto de cima (ou pela troca de apps). O app mostra o botão para pegar as fotos que você acabou de tirar.</p>'+
+    '</div></details>'+
     '<p class="note">Salva sozinho enquanto você digita.</p>'+
   '</div>'+
   '<h2 class="sheet-h">Backup</h2><p class="note">Os levantamentos e as fotos ficam só neste celular. Depois de cada visita, exporte o backup e guarde no Arquivos, no Drive ou no e-mail. O backup leva as fotos junto.</p>'+
@@ -519,6 +586,8 @@ function saveCfgForm(){ $$('[data-cf]').forEach(function(i){ cfg[i.dataset.cf]=i
 var vc=$('#view-cfg'), cfgTimer=null;
 vc.addEventListener('input',function(e){ if(e.target.dataset.cf){ cfg[e.target.dataset.cf]=e.target.value; clearTimeout(cfgTimer); cfgTimer=setTimeout(function(){ saveCfg(); setSync('salvo no celular'); },500); } });
 vc.addEventListener('click',function(e){ var b=e.target.closest('[data-fq]'); if(b){ cfg.fotoPdf=b.dataset.fq; saveCfg(); renderCfg(); return; }
+  var cm=e.target.closest('[data-cm]'); if(cm){ cfg.camModo=cm.dataset.cm; saveCfg(); renderCfg(); return; }
+  if(e.target.id==='tsTest'){ saveCfgForm(); window.location.href=(cfg.tsUrl||TS_PADRAO); return; }
   if(e.target.id==='logoDel'){ delete cfg.logo; saveCfg(); renderCfg(); toast('Logo removido.'); return; }
   if(e.target.id==='expBk') exportarBackup(e.target); });
 vc.addEventListener('change',async function(e){ var t=e.target;
@@ -621,6 +690,7 @@ try{ if(navigator.storage&&navigator.storage.persist) navigator.storage.persist(
   try{ var ro=JSON.parse(sessionStorage.getItem('lev:reopen')||'null'); sessionStorage.removeItem('lev:reopen'); var upd=sessionStorage.getItem('lev:updated'); sessionStorage.removeItem('lev:updated');
     if(ro&&ro.id){ var l=levs.find(function(x){ return x.id===ro.id; }); if(l){ cur=l; tab=ro.tab||'dados'; showView('lev'); if(ro.view==='item'&&ro.item){ var it=l.itens.find(function(x){ return x.id===ro.item; }); if(it){ curItem=it; showView('item'); } } } }
     if(upd) setTimeout(function(){ toast('App atualizado para a versão nova.'); },400); }catch(e){}
+  setTimeout(tsVoltou,700);
   setTimeout(checkUpdate,1500);
 })();
 window.__lev={get levs(){ return levs; }, get cur(){ return cur; }, cfg:function(){ return cfg; }, exp:function(){ return dadosExport(); }};

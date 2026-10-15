@@ -55,8 +55,8 @@ async function pdf(D, progress){
         doc.setFillColor(236,238,236); doc.rect(x,y,cw,bh,'F');
         if(im){ var s=Math.min(cw/im.w, bh/im.h), w=im.w*s, hh=im.h*s; try{ doc.addImage(im.src,'JPEG',x+(cw-w)/2,y+(bh-hh)/2,w,hh,'f'+f.id,'FAST'); }catch(e){} }
         doc.setFillColor.apply(doc,ASF); doc.rect(x,y,13,5.5,'F'); font(8,'bold',[255,255,255]); doc.text('F'+pad2(f.num), x+6.5, y+3.9, {align:'center'});
-        font(7.6,'normal',INK); var cap=doc.splitTextToSize(t(legendaFoto(f).replace(/^F\d+ - /,'')), cw).slice(0,2); doc.text(cap, x, y+bh+3.4);
-        font(6.6,'normal',MUT); doc.text(t(U.brDT(f.d)), x+cw, y+bh+3.4+(cap.length>1?3.2:0)+ (cap.length>1?0:0), {align:'right'}); }
+        font(7.6,'normal',INK); var cap=doc.splitTextToSize(t(legendaFoto(f).replace(/^F\d+ - /,'')), cw*0.6).slice(0,2); doc.text(cap, x, y+bh+3.4);
+        font(6.6,'normal',MUT); doc.text(t(U.brDT(f.d)), x+cw, y+bh+3.4, {align:'right'}); if(f.gps) doc.text(f.gps.lat.toFixed(5)+', '+f.gps.lng.toFixed(5), x+cw, y+bh+6.6, {align:'right'}); }
       y+=bh+capH+3; } y+=1; }
 
   // ---------------- capa ----------------
@@ -332,11 +332,11 @@ async function xlsx(D){
   sheets.push(ck);
 
   // ---------- Fotos ----------
-  var fo=new Sheet('Fotos'); fo.cols=[7,22,8,40,44,17,60];
+  var fo=new Sheet('Fotos'); fo.cols=[7,22,8,40,44,17,22,60];
   fo.set(0,0,cell('LISTA DE FOTOS',S.tit)); fo.set(1,0,cell('Mesma numeração do relatório em PDF e do arquivo ZIP de fotos.',S.note));
-  ['Nº','Onde','Item','Serviço','Legenda','Data / hora','Nome do arquivo no ZIP'].forEach(function(h,i){ fo.set(3,i,cell(h,S.head)); }); fo.freeze=4;
+  ['Nº','Onde','Item','Serviço','Legenda','Data / hora','Localização (GPS)','Nome do arquivo no ZIP'].forEach(function(h,i){ fo.set(3,i,cell(h,S.head)); }); fo.freeze=4;
   FL.list.forEach(function(f,i){ var arq=('F'+pad2(f.num)+' - '+f.onde+(f.item?' - #'+pad2(f.item.n)+' '+(f.item.serv||''):'')+(f.leg?' - '+f.leg:'')).replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').slice(0,110)+'.jpg';
-    [['F'+pad2(f.num),S.ctr],[f.onde,S.txt],[f.item?'#'+pad2(f.item.n):'',S.ctr],[f.item?(f.item.serv||f.item.desc||''):'',S.txt],[f.leg,S.txt],[U.brDT(f.d),S.ctr],[arq,S.txt]].forEach(function(c,k){ fo.set(4+i,k,cell(c[0]||'',c[1])); }); });
+    [['F'+pad2(f.num),S.ctr],[f.onde,S.txt],[f.item?'#'+pad2(f.item.n):'',S.ctr],[f.item?(f.item.serv||f.item.desc||''):'',S.txt],[f.leg,S.txt],[U.brDT(f.d),S.ctr],[f.gps? f.gps.lat+', '+f.gps.lng : '',S.ctr],[arq,S.txt]].forEach(function(c,k){ fo.set(4+i,k,cell(c[0]||'',c[1])); }); });
   sheets.push(fo);
 
   // ---------- Dados ----------
