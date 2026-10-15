@@ -29,3 +29,9 @@ App de celular para controlar a perda de material: a engenharia cadastra o proje
 O script `google-sheets/Materiais.gs` vai na planilha de materiais (Extensões → Apps Script) e grava as abas Indicadores, Lancamentos, Entregas, Pecas, Projeto, Materiais e Usuarios (com a coluna Perfil: Engenharia ou Campo).
 
 **Planilha de materiais:** https://docs.google.com/spreadsheets/d/1WPcWJEqgLLRL6I76wyO0XKB4qdPJqqbEG7LENq7842E/edit
+
+# Levantamento de Obra – checklist com fotos, medidas e orçamento
+
+App de celular para a visita de levantamento: dados da visita, ambientes com medidas (piso, paredes, teto calculados), itens com fotos marcadas, situação encontrada, causa, como executar, prioridade e memória de cálculo, checklist da visita e conclusões com assinatura. Gera o relatório fotográfico em PDF, a planilha de orçamento em Excel (por disciplina, com custo de material e mão de obra, BDI e fórmulas) e as fotos numeradas em ZIP.
+
+**Abrir / instalar:** https://yanmantovani17.github.io/rdo/levantamento/
