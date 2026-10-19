@@ -35,3 +35,11 @@ O script `google-sheets/Materiais.gs` vai na planilha de materiais (Extensões �
 App de celular para a visita de levantamento: dados da visita, ambientes com medidas (piso, paredes, teto calculados), itens com fotos marcadas, situação encontrada, causa, como executar, prioridade e memória de cálculo, checklist da visita e conclusões com assinatura. Gera o relatório fotográfico em PDF, a planilha de orçamento em Excel (por disciplina, com custo de material e mão de obra, BDI e fórmulas) e as fotos numeradas em ZIP.
 
 **Abrir / instalar:** https://yanmantovani17.github.io/rdo/levantamento/
+
+# EPI e Ferramentas – entregas com assinatura, estoque e durabilidade
+
+App de celular para cadastrar colaboradores, funções e o kit de EPIs e ferramentas de cada função, lançar a entrada de material (nota fiscal) e registrar cada entrega com a assinatura do colaborador e do responsável na tela. Compara quanto cada item durou com a durabilidade informada pelo fornecedor e aponta se o problema é do produto ou de mau uso.
+
+**Abrir / instalar:** https://yanmantovani17.github.io/rdo/epi/
+
+Os dados ficam num banco Supabase (PostgreSQL). Só entra quem tem login liberado pelo administrador, e as regras de acesso estão no próprio banco (`epi/banco/1-instalar.sql`). O Power BI lê as visões do esquema `bi` com um usuário só de leitura.
