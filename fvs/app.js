@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = 7;   // troque junto com version.json a cada publicação
+var APP_VER = 8;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
