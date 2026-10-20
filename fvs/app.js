@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = 6;   // troque junto com version.json a cada publicação
+var APP_VER = 7;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -115,7 +115,7 @@ function renderFList(){
     if(!q) return true;
     return norm(f.titulo+' '+f.local+' '+f.codigo+' '+f.num+' nº'+f.n+' '+f.n).indexOf(q)>=0; });
   var el=$('#flist');
-  if(!fichas.length){ el.innerHTML='<div class="empty"><b>Nenhuma FVS ainda</b>Toque em “+ Nova FVS”, escolha o serviço e o local. As 67 fichas da Libercon já estão no app.</div>'; return; }
+  if(!fichas.length){ el.innerHTML='<div class="empty"><b>Nenhuma FVS ainda</b>Toque em “+ Nova FVS”, escolha o serviço e o local. As '+MODELOS.length+' fichas da Libercon já estão no app.</div>'; return; }
   if(!list.length){ el.innerHTML='<div class="empty"><b>Nada encontrado</b>Mude a busca ou o filtro.</div>'; return; }
   var LIX='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>';
   var temAberta=list.some(function(f){ return stats(f).st!=='ok'; });
