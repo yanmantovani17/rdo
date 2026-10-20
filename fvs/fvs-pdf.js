@@ -14,11 +14,24 @@ function fit(iw,ih,bw,bh){ var s=Math.min(bw/iw,bh/ih); return {w:iw*s,h:ih*s}; 
 var GRAY=[217,217,217], LIGHT=[242,242,242], LINE=[90,90,90];
 
 async function build(f, cfg, getBlob){
-  var r=await layout(f, cfg, getBlob, false);
-  if(r.sigAlone) r=await layout(f, cfg, getBlob, true);   // tenta caber as assinaturas na mesma folha
-  return r.doc.output('blob');
+  // abre antes os PDFs anexados, para o rodapé contar as páginas deles
+  var srcs=[], extra=0, pdfs=(f.anexos||[]).filter(function(a){ return a.tipo==='pdf'; });
+  if(pdfs.length && window.PDFLib){
+    for(var i=0;i<pdfs.length;i++){
+      try{ var b=await getBlob(pdfs[i].id); if(!b) continue;
+        var src=await PDFLib.PDFDocument.load(await b.arrayBuffer(),{ignoreEncryption:true}); srcs.push(src); extra+=src.getPageCount();
+      }catch(e){ console.error('anexo PDF', e); }
+    }
+  }
+  var r=await layout(f, cfg, getBlob, false, extra);
+  if(r.sigAlone) r=await layout(f, cfg, getBlob, true, extra);   // tenta caber as assinaturas na mesma folha
+  if(!srcs.length) return r.doc.output('blob');
+  // junta os PDFs anexados no final do arquivo da FVS
+  var out=await PDFLib.PDFDocument.load(r.doc.output('arraybuffer'));
+  for(var k=0;k<srcs.length;k++){ var pgs=await out.copyPages(srcs[k], srcs[k].getPageIndices()); pgs.forEach(function(pg){ out.addPage(pg); }); }
+  return new Blob([await out.save()],{type:'application/pdf'});
 }
-async function layout(f, cfg, getBlob, compact){
+async function layout(f, cfg, getBlob, compact, extra){
   var jsPDF=window.jspdf.jsPDF; var FS=compact?6.3:7.2, PAD=compact?0.7:1.1, SIGH=compact?15:22;
   var doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4',compress:true});
   var W=297, H=210, M=8, CW=W-2*M;
@@ -103,6 +116,49 @@ async function layout(f, cfg, getBlob, compact){
       var box=fit(sd.s.w,sd.s.h,d.cell.width-20,d.cell.height-7); try{ doc.addImage(sd.u,'PNG',d.cell.x+(d.cell.width-box.w)/2,d.cell.y+1,box.w,box.h); }catch(e){} }
   }));
 
+  // ---- dados do ensaio (SPT / CPTU) ----
+  var E=f.ensaio, EN=window.FVSEnsaio;
+  if(E && EN){
+    doc.addPage(); var ey=M;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20);
+    doc.text(t((E.tipo==='spt'?'BOLETIM DE SONDAGEM À PERCUSSÃO (SPT)':'DADOS DE CAMPO - ENSAIO DE PIEZOCONE (CPTU)')+' - '+(f.local||'')+' - FVS Nº '+nFvs), M, ey+4, {maxWidth:CW-50});
+    if(LG){ var lw2=Math.min(36,8*LG.ar); try{ doc.addImage(LG.src,LG.fmt,W-M-lw2,M,lw2,lw2/LG.ar); }catch(e){} }
+    var F=EN.fmt, cab;
+    if(E.tipo==='spt') cab=[['Furo: '+(f.local||''),'Cota da boca: '+F(E.cota)+' m','Sondador: '+(E.sondador||'—'),'Data: '+br(f.inicio)],
+      ['Revestimento até: '+F(E.revest)+' m','Profundidade final: '+F(E.prof)+' m','NA inicial: '+(E.seco?'seco':F(E.naIni)+' m'),'NA após 12 h: '+(E.seco?'seco':F(E.na12)+' m')],
+      [{content:'Motivo da paralisação: '+(E.motivo||'—'),colSpan:4}]];
+    else cab=[['Ponto: '+(f.local||''),'Cota da boca: '+F(E.cota)+' m','Operador: '+(E.operador||'—'),'Data: '+br(f.inicio)],
+      ['Ponteira nº: '+(E.ponteira||'—'),'Velocidade média: '+F(E.velocidade)+' mm/s','Pré-furo até: '+F(E.prefuro)+' m','NA: '+F(E.na)+' m'],
+      ['Profundidade final: '+F(E.prof)+' m','Deriva do zero: '+F(E.deriva)+' kPa',{content:'Motivo da paralisação: '+(E.motivo||'—'),colSpan:2}]];
+    doc.autoTable(Object.assign({}, common, {startY:ey+9, body:cab.map(function(r){ return r.map(function(c){ return typeof c==='string'? t(c) : Object.assign({},c,{content:t(c.content)}); }); }),
+      styles:Object.assign({}, common.styles, {fontSize:8})}));
+    if(E.tipo==='spt'){
+      var linhas=E.linhas.filter(function(r){ return r.g1!==''||r.g2!==''||r.g3!==''||r.solo; });
+      var AV={}; EN.AVANCO.forEach(function(a){ AV[a[0]]=a[1]; });
+      var nmax=50;
+      doc.autoTable(Object.assign({}, common, {startY:doc.lastAutoTable.finalY+3, showHead:'everyPage',
+        head:[['Prof. (m)','Golpes 1º 15 cm','Golpes 2º 15 cm','Golpes 3º 15 cm','N-SPT','Perfil N-SPT (0 a 50)','Avanço','Descrição do solo']],
+        body:linhas.map(function(r){ return [F(r.p), t(r.g1), t(r.g2), t(r.g3), EN.nspt(r)||'—', '', t(AV[r.av]||r.av||''), t(r.solo||'')]; }),
+        columnStyles:{0:{cellWidth:18,halign:'center'},1:{cellWidth:22,halign:'center'},2:{cellWidth:22,halign:'center'},3:{cellWidth:22,halign:'center'},4:{cellWidth:16,halign:'center',fontStyle:'bold'},5:{cellWidth:62},6:{cellWidth:28},7:{cellWidth:CW-190}},
+        styles:Object.assign({}, common.styles, {fontSize:8}),
+        didDrawCell:function(d){ if(d.section!=='body'||d.column.index!==5) return; var n=EN.num(EN.nspt(linhas[d.row.index]));
+          var x0=d.cell.x+1.5, w=d.cell.width-3; doc.setDrawColor(200); doc.setLineWidth(0.1); [10,20,30,40].forEach(function(k){ var gx=x0+w*k/nmax; doc.line(gx,d.cell.y+0.6,gx,d.cell.y+d.cell.height-0.6); });
+          if(n!=null){ var bw=w*Math.min(n,nmax)/nmax; doc.setFillColor(38,49,59); doc.rect(x0,d.cell.y+1.2,Math.max(bw,0.4),d.cell.height-2.4,'F'); }
+          doc.setDrawColor(LINE[0]); doc.setLineWidth(0.15); } }));
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(90);
+      doc.text(t('N-SPT = golpes do 2º + 3º segmentos de 15 cm. * = penetração incompleta (golpes/cm). Linhas do gráfico a cada 10 golpes.'), M, doc.lastAutoTable.finalY+4);
+    } else {
+      var ds=E.diss||[];
+      doc.autoTable(Object.assign({}, common, {startY:doc.lastAutoTable.finalY+3,
+        head:[['Ensaio de dissipação','Profundidade (m)','u inicial (kPa)','t50 (min)','Duração (min)','Observação']],
+        body: ds.length? ds.map(function(d,i){ return [String(i+1), F(d.p), F(d.u0), F(d.t50), F(d.dur), t(d.obs||'')]; }) : [[{content:'Nenhum ensaio de dissipação registrado.',colSpan:6}]],
+        columnStyles:{0:{cellWidth:34,halign:'center'},1:{cellWidth:32,halign:'center'},2:{cellWidth:32,halign:'center'},3:{cellWidth:28,halign:'center'},4:{cellWidth:30,halign:'center'}},
+        styles:Object.assign({}, common.styles, {fontSize:8})}));
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(90);
+      doc.text(t('Os gráficos de resistência de ponta (qc), atrito lateral (fs) e poropressão (u2) estão no arquivo do equipamento / relatório da empresa de sondagem.'), M, doc.lastAutoTable.finalY+4);
+    }
+  }
+
   // ---- photo annex ----
   if(photos.length){
     var cols=3, rows=2, gap=5, cellW=(CW-gap*(cols-1))/cols, top=M+10, cellH=(H-top-14-gap*(rows-1))/rows, capH=8, imgH=cellH-capH;
@@ -122,12 +178,30 @@ async function layout(f, cfg, getBlob, compact){
     }
   }
 
+  // ---- anexos (fotos de documentos) ----
+  var anx=f.anexos||[];
+  if(anx.length){
+    doc.addPage(); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20);
+    doc.text(t('ANEXOS - FVS Nº '+nFvs+' - '+f.titulo), M, M+4, {maxWidth:CW-50});
+    if(LG){ var lw3=Math.min(36,8*LG.ar); try{ doc.addImage(LG.src,LG.fmt,W-M-lw3,M,lw3,lw3/LG.ar); }catch(e){} }
+    doc.autoTable(Object.assign({}, common, {startY:M+9, head:[['Nº','Arquivo','Descrição','Tipo','Data']],
+      body:anx.map(function(a,i){ return [String(i+1), t(a.nome), t(a.desc||''), a.tipo==='pdf'?'PDF (páginas no final)':'Foto (página a seguir)', br(a.d)]; }),
+      columnStyles:{0:{cellWidth:12,halign:'center'},1:{cellWidth:80},3:{cellWidth:44},4:{cellWidth:24,halign:'center'}}}));
+    for(var ai=0; ai<anx.length; ai++){ var a=anx[ai]; if(a.tipo!=='img') continue;
+      try{ var ab=await getBlob(a.id); if(!ab) continue; var au=await blobToDataURL(ab); var as=await imgSize(au); if(!as) continue;
+        doc.addPage(); doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(20);
+        doc.text(t('Anexo '+(ai+1)+' - '+a.nome+(a.desc?' - '+a.desc:'')), M, M+4, {maxWidth:CW});
+        var bx2=fit(as.w,as.h,CW,H-M-16-8); doc.addImage(au,'JPEG',M+(CW-bx2.w)/2,M+8,bx2.w,bx2.h,undefined,'FAST');
+      }catch(e){}
+    }
+  }
+
   // ---- footer ----
-  var pages=doc.getNumberOfPages(), stamp=new Date();
+  var pages=doc.getNumberOfPages(), total=pages+(extra||0), stamp=new Date();
   var when=String(stamp.getDate()).padStart(2,'0')+'/'+String(stamp.getMonth()+1).padStart(2,'0')+'/'+stamp.getFullYear()+' '+String(stamp.getHours()).padStart(2,'0')+':'+String(stamp.getMinutes()).padStart(2,'0');
   for(var pg=1; pg<=pages; pg++){ doc.setPage(pg); doc.setFont('helvetica','normal'); doc.setFontSize(6.8); doc.setTextColor(110);
     doc.text(t('FVS Nº '+nFvs+' - '+(f.obra||cfg.obra||'')+' - '+(f.local||'')), M, H-5, {maxWidth:CW-60});
-    doc.text(t('Página '+pg+' de '+pages+'  -  gerado em '+when), W-M, H-5, {align:'right'}); }
+    doc.text(t('Página '+pg+' de '+total+'  -  gerado em '+when), W-M, H-5, {align:'right'}); }
   return {doc:doc, sigAlone:sigAlone};
 }
 

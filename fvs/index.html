@@ -232,6 +232,26 @@ body.locked > *:not(#login):not(script){display:none!important}
 #login .btn{min-height:50px;font-size:1.05rem}
 #login .err{background:rgba(240,146,90,.18);border:1px solid rgba(240,146,90,.5);border-radius:8px;padding:10px 12px;font-size:.92rem}
 #login .foot{font-size:.82rem;opacity:.6;margin-top:6px}
+/* dados do ensaio (SPT / CPTU) e anexos */
+.spt-head,.spt-row{display:grid;grid-template-columns:56px repeat(3,minmax(0,1fr)) 40px 64px;gap:4px;align-items:center}
+.spt-head span{font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center}
+.spt-row{padding:6px 0;border-top:1px dashed var(--line)}
+.spt-row input,.spt-row select{min-height:40px;padding:6px 4px;text-align:center;font-family:var(--f-mono);font-size:.95rem;width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:7px}
+.spt-row .c-n{font-family:var(--f-mono);font-weight:700;text-align:center;font-size:1.05rem}
+.spt-row .c-solo{grid-column:1 / span 5;text-align:left;font-family:var(--f-body);font-size:.9rem;padding:6px 10px}
+.spt-row .x{grid-column:6;justify-self:center;width:36px;height:36px}
+.diss-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px 0;border-top:1px dashed var(--line);align-items:end}
+.diss-row label{display:flex;flex-direction:column;gap:3px;font-size:.68rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;min-width:0}
+.diss-row input{min-height:40px;padding:6px;font-family:var(--f-mono);background:var(--surface-2);border:1px solid var(--line);border-radius:7px;width:100%}
+.diss-row .c-solo{grid-column:1 / span 3;font-size:.9rem;min-height:40px;padding:6px 10px;background:var(--surface-2);border:1px solid var(--line);border-radius:7px}
+.diss-row .x{justify-self:center;width:36px;height:36px}
+.anx-list{display:flex;flex-direction:column;gap:8px}
+.anx{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface-2)}
+.anx .grow{min-width:0;display:flex;flex-direction:column;gap:4px}
+.anx-ico{flex:none;width:46px;height:46px;border-radius:8px;border:0;background:var(--asphalt);color:var(--asphalt-ink);font-family:var(--f-display);font-weight:700;letter-spacing:.05em;cursor:pointer}
+.anx-nome{font-weight:600;font-size:.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.anx-meta{font-size:.78rem;color:var(--muted)}
+.anx input{min-height:38px;font-size:.88rem;padding:6px 10px}
 </style>
 </head>
 <body class="locked">
@@ -406,6 +426,7 @@ body.locked > *:not(#login):not(script){display:none!important}
 <script src="jspdf.umd.min.js"></script>
 <script src="jspdf.plugin.autotable.min.js"></script>
 <script src="fvs-pdf.js"></script>
+<script src="ensaio.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

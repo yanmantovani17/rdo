@@ -1,6 +1,6 @@
 // Mantém o app funcionando sem internet. Ao publicar uma nova versão, troque VERSAO.
-const VERSAO = 'fvs-v8';
-const ARQUIVOS = ['./', 'index.html', 'app.js', 'fvs-pdf.js', 'modelos.js', 'logo.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'xlsx.mini.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'version.json'];
+const VERSAO = 'fvs-v9';
+const ARQUIVOS = ['./', 'index.html', 'app.js', 'ensaio.js', 'pdf-lib.min.js', 'fvs-pdf.js', 'modelos.js', 'logo.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'xlsx.mini.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'version.json'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSAO).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('fvs-') && k !== VERSAO).map(k => caches.delete(k)))).then(() => self.clients.claim()));

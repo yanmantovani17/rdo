@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var APP_VER = 8;   // troque junto com version.json a cada publicação
+var APP_VER = 9;   // troque junto com version.json a cada publicação
 var $ = function(s, r){ return (r||document).querySelector(s); };
 var $$ = function(s, r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); };
 function h(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -70,8 +70,9 @@ function novaFicha(m, local, proj, ini){
     itens:itens, local:local, projetos:proj||'', info:'Verificação preliminar amostral, que não implica na aceitação definitiva dos serviços.',
     obsFinais:'', inicio:ini||todayISO(), termino:'', unidade:cfg.unidade||'', obra:cfg.obra||'',
     ass:{prod:{nome:cfg.prod||'',data:'',sig:null}, qual:{nome:cfg.qual||'',data:'',sig:null}, eng:{nome:cfg.eng||'',data:'',sig:null}},
-    fotos:[], criado:Date.now(), atualizado:Date.now() };
+    fotos:[], anexos:[], criado:Date.now(), atualizado:Date.now() };
 }
+function prepFicha(f){ if(!f.anexos) f.anexos=[]; var m=modeloById(f.modelo); if(window.FVSEnsaio){ var t=FVSEnsaio.tipo(f,m); if(t) FVSEnsaio.init(f,t); } return f; }
 function itemState(it){ if(!it.v1) return ''; if(it.v1.c!=='R') return it.v1.c; if(it.v2&&it.v2.c!=='R') return 'RA'; return 'R'; }
 function stats(f){ var t=f.itens.length, feitos=0, pend=0, rep=0, last='';
   f.itens.forEach(function(it){ if(it.v1){ feitos++; if(it.v1.d>last) last=it.v1.d; if(it.v1.c==='R'){ rep++; if(!it.v2||it.v2.c==='R') pend++; else if(it.v2.d>last) last=it.v2.d; } } });
@@ -198,13 +199,14 @@ $('#nCreate').addEventListener('click',async function(){
   if(locs.length>40){ toast('No máximo 40 locais de uma vez.'); return; }
   var made=locs.map(function(l){ return novaFicha(novoModelo, l, $('#nProj').value.trim(), $('#nIni').value||todayISO()); });
   for(var i=0;i<made.length;i++){ fichas.push(made[i]); await persist(made[i]); }
+  made.forEach(prepFicha);
   if(made.length===1){ cur=made[0]; replaceNav(); showView('ficha'); toast('FVS Nº'+String(cur.n).padStart(3,'0')+' aberta.'); }
   else { goHome(); toast(made.length+' FVS abertas.'); }
 });
 
 // ---------- ficha ----------
 function renderFicha(opts){
-  var f=cur; if(!f){ goHome(); return; }
+  var f=cur; if(!f){ goHome(); return; } prepFicha(f);
   setSub(fCode(f)+' · '+f.titulo, f.local, 'Nº'+String(f.n).padStart(3,'0'));
   var v=$('#view-ficha'); var html='';
   var nCk=f.cond.length+f.seg.length+f.amb.length;
@@ -217,6 +219,7 @@ function renderFicha(opts){
     '<label class="field"><span class="lbl">Unidade de negócio</span><input type="text" data-k="unidade" value="'+h(f.unidade)+'"></label>'+
     '<label class="field"><span class="lbl">Informações relevantes</span><textarea data-k="info" rows="2">'+h(f.info)+'</textarea></label>'+
     '<p class="note">Modelo: '+h(f.codigo)+'</p></div></details>';
+  if(f.ensaio) html+=FVSEnsaio.html(f);
   // checks
   if(nCk){
     html+='<details class="card" id="c-ck"><summary><span class="dot" id="ckDot"></span><h2>Antes de começar</h2><span class="sum" id="ckSum"></span><span class="chev">›</span></summary><div class="body">'+
@@ -232,6 +235,12 @@ function renderFicha(opts){
   html+='<details class="card" id="c-obs"><summary><span class="dot'+(f.obsFinais||f.fotos.length?' on':'')+'"></span><h2>Observações e fotos gerais</h2><span class="sum">'+(f.fotos.length?f.fotos.length+' foto(s)':'')+'</span><span class="chev">›</span></summary><div class="body">'+
     '<label class="field"><span class="lbl">Observações finais</span><textarea data-k="obsFinais" rows="3">'+h(f.obsFinais)+'</textarea></label>'+
     '<div class="field"><span class="lbl">Fotos gerais</span><div class="thumbs" data-gfotos>'+thumbsHTML(f.fotos,'g')+addPhHTML('g')+'</div></div></div></details>';
+  // anexos (certificados, notas fiscais, laudos)
+  html+='<details class="card" id="c-anx"'+(f.anexos.length?' open':'')+'><summary><span class="dot'+(f.anexos.length?' on':'')+'" id="anxDot"></span><h2>Anexos</h2><span class="sum" id="anxSum">'+(f.anexos.length?f.anexos.length+' arquivo(s)':'')+'</span><span class="chev">›</span></summary><div class="body">'+
+    '<p class="note">Certificado do material, nota fiscal, laudo, boletim do ensaio… Tire uma foto ou escolha o arquivo (foto ou PDF). Tudo sai junto, no final do PDF da FVS.</p>'+
+    '<div class="row"><label class="btn dark grow">📷 Tirar foto<input type="file" accept="image/*" capture="environment" data-anx hidden></label>'+
+    '<label class="btn grow">📎 Escolher arquivo<input type="file" accept="image/*,application/pdf,.pdf" multiple data-anx hidden></label></div>'+
+    '<div class="anx-list" id="anxList">'+anexosHTML(f)+'</div></div></details>';
   // signatures
   html+='<details class="card" id="c-ass"><summary><span class="dot" id="assDot"></span><h2>Assinaturas</h2><span class="sum" id="assSum"></span><span class="chev">›</span></summary><div class="body"><div class="sigs">'+
     [['prod','Produção'],['qual','Qualidade'],['eng','Engenharia']].map(function(p){ var a=f.ass[p[0]];
@@ -291,6 +300,9 @@ function setVer(i,w,c){
 }
 var fv=$('#view-ficha');
 fv.addEventListener('click',function(e){
+  if(cur.ensaio && e.target.closest('#c-ens') && FVSEnsaio.handle(e,cur,fv)){ touch(); return; }
+  var ax=e.target.closest('[data-anxdel]'); if(ax){ removerAnexo(ax.dataset.anxdel); return; }
+  var ao=e.target.closest('[data-anxopen]'); if(ao){ abrirAnexo(ao.dataset.anxopen); return; }
   var b=e.target.closest('.seg3 button'); if(b){ setVer(+b.dataset.i, b.dataset.w, b.dataset.c); return; }
   var m=e.target.closest('[data-more]'); if(m){ var i=+m.dataset.more; cur.itens[i]._open=true; rerenderItem(i); var ta=$('[data-obs="'+i+'"]'); if(ta) ta.focus(); return; }
   var rm=e.target.closest('[data-rmph]'); if(rm){ e.preventDefault(); removePhoto(rm.dataset.owner, rm.dataset.rmph); return; }
@@ -306,16 +318,49 @@ fv.addEventListener('click',function(e){
 fv.addEventListener('keydown',function(e){ var sg=e.target.closest('[data-sign]'); if(sg&&(e.key==='Enter'||e.key===' ')){ e.preventDefault(); openPad(sg.dataset.sign); } });
 fv.addEventListener('input',function(e){
   var t=e.target;
+  if(cur.ensaio && t.closest('#c-ens')){ if(FVSEnsaio.handle(e,cur,fv)) touch(); return; }
+  if(t.dataset.anxdesc!=null){ var an=cur.anexos.find(function(a){ return a.id===t.dataset.anxdesc; }); if(an){ an.desc=t.value; touch(); } return; }
   if(t.dataset.k){ cur[t.dataset.k]=t.value; if(t.dataset.k==='local'||t.dataset.k==='titulo') setSub(fCode(cur)+' · '+cur.titulo, cur.local, 'Nº'+String(cur.n).padStart(3,'0')); touch(); return; }
   if(t.dataset.obs!=null){ cur.itens[+t.dataset.obs].obs=t.value; touch(); return; }
   if(t.dataset.a){ var s=t.closest('.sig').dataset.s; cur.ass[s][t.dataset.a]=t.value; touch(); return; }
 });
 fv.addEventListener('change',function(e){
   var t=e.target;
+  if(cur.ensaio && t.closest('#c-ens')){ if(t.tagName==='SELECT'||t.type==='checkbox'){ if(FVSEnsaio.handle(e,cur,fv)) touch(); } return; }
+  if(t.dataset.anx!=null){ var fl2=Array.prototype.slice.call(t.files||[]); t.value=''; addAnexos(fl2); return; }
   if(t.dataset.ck){ cur.chk[t.dataset.ck][+t.dataset.i]=t.checked; refreshFichaMeta(); touch(); return; }
   if(t.dataset.addph!=null){ var fl=Array.prototype.slice.call(t.files||[]); t.value=''; addPhotos(t.dataset.addph, fl); return; }
   if(t.type==='date' && t.dataset.k){ cur[t.dataset.k]=t.value; touch(); }
 });
+
+// ---------- anexos ----------
+function tamanho(b){ return b>1048576? (b/1048576).toFixed(1).replace('.',',')+' MB' : Math.max(1,Math.round(b/1024))+' KB'; }
+function anexosHTML(f){ if(!f.anexos.length) return '<p class="note" style="margin:0">Nenhum anexo ainda.</p>';
+  return f.anexos.map(function(a,i){ return '<div class="anx"><button type="button" class="anx-ico" data-anxopen="'+a.id+'" aria-label="Abrir anexo">'+(a.tipo==='pdf'?'PDF':'IMG')+'</button>'+
+    '<div class="grow"><div class="anx-nome">'+(i+1)+'. '+h(a.nome)+'</div><div class="anx-meta">'+tamanho(a.tam||0)+' · '+brShort(a.d)+'</div>'+
+    '<input type="text" data-anxdesc="'+a.id+'" value="'+h(a.desc||'')+'" placeholder="Descrição (ex.: certificado do aço CA-50, NF 1234)"></div>'+
+    '<button type="button" class="x" data-anxdel="'+a.id+'" aria-label="Remover anexo">×</button></div>'; }).join(''); }
+function anexosRefresh(){ var f=cur; $('#anxList').innerHTML=anexosHTML(f); $('#anxSum').textContent=f.anexos.length?f.anexos.length+' arquivo(s)':''; $('#anxDot').className='dot'+(f.anexos.length?' on':''); }
+async function addAnexos(files){
+  if(!files||!files.length) return; var f=cur; setSync('salvando anexo…');
+  for(var k=0;k<files.length;k++){ var fl=files[k];
+    try{
+      var pdf=/pdf$/i.test(fl.type)||/\.pdf$/i.test(fl.name||'');
+      if(!pdf && !/^image\//.test(fl.type)){ toast('Só dá para anexar foto ou PDF.'); continue; }
+      if(fl.size>25*1048576){ toast('Arquivo muito grande (máximo 25 MB): '+fl.name); continue; }
+      var blob= pdf? fl : await shrinkAnexo(fl);
+      var id=uid('ax'); await DB.putB(id,blob);
+      var nome=(fl.name&&!/^image\.(jpe?g|png|heic)$/i.test(fl.name))? fl.name : 'Foto '+(f.anexos.length+1)+'.jpg';
+      f.anexos.push({id:id, nome:nome, tipo:pdf?'pdf':'img', tam:blob.size, d:todayISO(), desc:''});
+    }catch(e){ console.error(e); toast('Não consegui ler o arquivo '+(fl.name||'')+'.'); }
+  }
+  anexosRefresh(); touch(); toast('Anexo salvo na FVS.');
+}
+// fotos de documento: até 2200 px para o texto continuar legível no PDF
+async function shrinkAnexo(file){ var im=await loadImg(file); var max=2200, s=Math.min(1, max/Math.max(im.naturalWidth,im.naturalHeight)); var c=document.createElement('canvas'); c.width=Math.round(im.naturalWidth*s); c.height=Math.round(im.naturalHeight*s); var x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(im,0,0,c.width,c.height); return new Promise(function(res){ c.toBlob(res,'image/jpeg',0.85); }); }
+function removerAnexo(id){ var a=cur.anexos.find(function(x){ return x.id===id; }); if(!a) return;
+  confirmar('Remover este anexo?', a.nome+'. Ele sai da FVS e do celular.', 'Remover', function(){ cur.anexos=cur.anexos.filter(function(x){ return x!==a; }); DB.delB(id).catch(function(){}); anexosRefresh(); touch(); }); }
+async function abrirAnexo(id){ var u=await blobURL(id); if(!u){ toast('Anexo não encontrado neste celular.'); return; } var a=document.createElement('a'); a.href=u; a.target='_blank'; a.rel='noopener'; document.body.appendChild(a); a.click(); a.remove(); }
 
 // ---------- photos ----------
 var urlCache={};
@@ -369,7 +414,7 @@ function deleteFicha(f){
   confirmar('Apagar a FVS Nº'+String(f.n).padStart(3,'0')+'?', f.titulo+' – '+f.local+'. Isso apaga as marcações, fotos e assinaturas dessa ficha e tira as linhas dela da planilha do Google. Não dá para desfazer.', 'Apagar', function(){ apagarFicha(f); });
 }
 async function apagarFicha(f){
-  var keys=[]; f.fotos.forEach(function(p){ keys.push(p.id); }); f.itens.forEach(function(it){ it.fotos.forEach(function(p){ keys.push(p.id); }); }); ['prod','qual','eng'].forEach(function(k){ if(f.ass[k].sig) keys.push(f.ass[k].sig); });
+  var keys=[]; f.fotos.forEach(function(p){ keys.push(p.id); }); f.itens.forEach(function(it){ it.fotos.forEach(function(p){ keys.push(p.id); }); }); ['prod','qual','eng'].forEach(function(k){ if(f.ass[k].sig) keys.push(f.ass[k].sig); }); (f.anexos||[]).forEach(function(a){ keys.push(a.id); });
   clearTimeout(saveTimers[f.id]); delete saveTimers[f.id];
   await DB.del(f.id); keys.forEach(function(k){ DB.delB(k).catch(function(){}); }); gsRemove(f.id);
   fichas=fichas.filter(function(x){ return x!==f; }); var sent=LS.get('gsenviados')||{}; delete sent[f.id]; LS.set('gsenviados',sent);
@@ -406,7 +451,9 @@ function gsFicha(f){
       it.v1?it.v1.c:'', it.v1?it.v1.i:'', it.v1?it.v1.d:'', it.v2?it.v2.c:'', it.v2?it.v2.i:'', it.v2?it.v2.d:'', resultadoFinal(it), it.obs||'']; });
   var insp=[]; f.itens.forEach(function(it){ [it.v1,it.v2].forEach(function(v){ if(v&&v.i&&insp.indexOf(v.i)<0) insp.push(v.i); }); });
   return {id:f.id, fvs:[f.obra||cfg.obra||'', f.n, f.codigo, proc, f.cat||'', f.local, f.projetos||'', f.inicio||'', f.termino||'',
-    s.t, s.feitos, A, R, N, s.pend, (A+R)? A/(A+R) : '', ST_LBL[s.st], insp.join(', ')||cfg.insp||'', f.atualizado||Date.now()], itens:itens};
+    s.t, s.feitos, A, R, N, s.pend, (A+R)? A/(A+R) : '', ST_LBL[s.st], insp.join(', ')||cfg.insp||'', f.atualizado||Date.now()], itens:itens,
+    ensaio: window.FVSEnsaio? FVSEnsaio.planilha(f, f.obra||cfg.obra||'') : null,
+    anexos: (f.anexos||[]).map(function(a){ return a.nome+(a.desc?' – '+a.desc:''); }).join(' | ')};
 }
 function gsEnviada(f){ var sent=LS.get('gsenviados')||{}; return !!(sent[f.id] && sent[f.id]>=(f.atualizado||1)) && gsQueue().indexOf(f.id)<0; }
 // coloca na fila toda ficha que a planilha ainda não tem (nova, alterada ou restaurada de backup)
@@ -690,7 +737,8 @@ async function genPDF(){
   if(!window.jspdf||!window.FVSPDF){ toast('O gerador de PDF não carregou. Abra o app uma vez com internet.'); return; }
   var s=stats(f); if(s.feitos<s.t && !confirm('Ainda faltam '+(s.t-s.feitos)+' itens sem marcação. Gerar o PDF assim mesmo?')) return;
   btn.disabled=true; btn.textContent='Montando o PDF…';
-  try{ var blob=await window.FVSPDF.build(f, cfg, function(k){ return DB.getB(k); });
+  try{ if((f.anexos||[]).some(function(a){ return a.tipo==='pdf'; }) && !window.PDFLib) await loadScript('pdf-lib.min.js');
+    var blob=await window.FVSPDF.build(f, cfg, function(k){ return DB.getB(k); });
     await deliver(fileBase(f)+'.pdf', blob, 'application/pdf', 'PDF da FVS Nº'+String(f.n).padStart(3,'0')+' pronto.'); }
   catch(e){ console.error(e); toast('Erro ao montar o PDF. Tente de novo.'); }
   btn.disabled=false; btn.textContent='Gerar PDF';

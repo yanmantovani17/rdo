@@ -79,15 +79,22 @@ function fvsReceber_(body, quem) {
   fichas.forEach(function (f) { ids[f.id] = true; });
   remover.forEach(function (id) { ids[id] = true; });
   var nome = (quem && (quem.nome || quem.usuario)) || '';
-  var novosF = [], novosI = [];
+  var novosF = [], novosI = [], novosS = [], novosC = [], novosA = [];
   fichas.forEach(function (f) {
     var l = fvsDatas_('FVS', f.fvs);
     l[FVS_ABAS.FVS.indexOf('Preenchido_por')] = nome;
     novosF.push(l.concat([f.id]));
     (f.itens || []).forEach(function (it) { novosI.push(fvsDatas_('Itens', it).concat([f.id])); });
+    var e = f.ensaio || {};
+    (e.spt || []).forEach(function (r) { novosS.push(fvsDatas_('SPT', r).concat([f.id])); });
+    (e.cptu || []).forEach(function (r) { novosC.push(fvsDatas_('CPTU', r).concat([f.id])); });
+    if (f.anexos) novosA.push(fvsDatas_('Anexos', [f.fvs[0], f.fvs[1], f.fvs[3], f.fvs[5], f.anexos, f.fvs[18]]).concat([f.id]));
   });
   fvsRegravar_(ss, 'FVS', ids, novosF);
   fvsRegravar_(ss, 'Itens', ids, novosI);
+  fvsRegravar_(ss, 'SPT', ids, novosS);
+  fvsRegravar_(ss, 'CPTU', ids, novosC);
+  fvsRegravar_(ss, 'Anexos', ids, novosA);
   fvsIndicadores_(ss, false);
   return { ok: true, fichas: fichas.length, removidas: remover.length };
 }
@@ -101,7 +108,13 @@ var FVS_ABAS = {
   Itens: ['Obra', 'FVS_N', 'Processo', 'Local', 'Mes', 'Secao', 'Item_N', 'Item', 'O_que_verificar',
           'Verif_1', 'Inspetor_1', 'Data_1', 'Verif_2', 'Inspetor_2', 'Data_2', 'Resultado_final', 'Observacao', 'Id']
 };
-var FVS_DATAS = { FVS: [8, 9, 19], Itens: [12, 15] };   // colunas (1 = A) que são datas
+FVS_ABAS.SPT = ['Obra', 'FVS_N', 'Furo', 'Cota_boca', 'Prof_m', 'Golpes_1', 'Golpes_2', 'Golpes_3', 'NSPT', 'Avanco', 'Solo',
+                'NA_inicial', 'NA_12h', 'Prof_final', 'Motivo_paralisacao', 'Sondador', 'Data', 'Id'];
+FVS_ABAS.CPTU = ['Obra', 'FVS_N', 'Ponto', 'Cota_boca', 'Pre_furo_m', 'NA_m', 'Prof_final_m', 'Motivo_paralisacao', 'Ponteira', 'Velocidade_mm_s',
+                 'Deriva_kPa', 'Operador', 'Dissip_prof_m', 'u_inicial_kPa', 't50_min', 'Duracao_min', 'Obs', 'Data', 'Id'];
+FVS_ABAS.Anexos = ['Obra', 'FVS_N', 'Processo', 'Local', 'Anexos', 'Atualizado_em', 'Id'];
+var FVS_DATAS = { FVS: [8, 9, 19], Itens: [12, 15], SPT: [17], CPTU: [18], Anexos: [6] };
+var FVS_ORDEM = { Itens: 6, SPT: 4, CPTU: 12 };   // segunda chave de ordenação (0 = A) depois do Nº da FVS   // colunas (1 = A) que são datas
 
 // rode esta função uma vez no editor se quiser recriar a aba Indicadores do zero
 function fvsRefazerIndicadores() { fvsIndicadores_(planilha_(), true); }
@@ -140,12 +153,13 @@ function fvsRegravar_(ss, nome, ids, novos) {
     sh.getRange(2, 1, ultima - 1, n).clearContent();
   }
   var todas = manter.concat(novos);
-  todas.sort(function (a, b) { return (Number(a[1]) - Number(b[1])) || ((Number(a[6]) || 0) - (Number(b[6]) || 0)); });
+  var o2 = FVS_ORDEM[nome] || 0;
+  todas.sort(function (a, b) { return (Number(a[1]) - Number(b[1])) || (o2 ? ((Number(a[o2]) || 0) - (Number(b[o2]) || 0)) : 0); });
   if (todas.length) {
     if (nome === 'Itens') sh.getRange(2, 5, todas.length, 1).setNumberFormat('@');   // Mes como texto (2026-10)
     sh.getRange(2, 1, todas.length, n).setValues(todas);
     FVS_DATAS[nome].forEach(function (c) {
-      sh.getRange(2, c, todas.length, 1).setNumberFormat(c === 19 ? 'dd/mm/yyyy hh:mm' : 'dd/mm/yyyy');
+      sh.getRange(2, c, todas.length, 1).setNumberFormat((nome === 'FVS' && c === 19) || nome === 'Anexos' ? 'dd/mm/yyyy hh:mm' : 'dd/mm/yyyy');
     });
     if (nome === 'FVS') sh.getRange(2, 16, todas.length, 1).setNumberFormat('0%');
   }
